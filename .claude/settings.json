@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npx eslint src/app/[tenant]/track --no-warn-ignored)",
+      "PowerShell(npx tsc --noEmit)"
+    ]
+  }
+}
