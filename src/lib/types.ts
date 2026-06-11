@@ -82,6 +82,9 @@ export interface Order {
   tax: number;
   total: number;
   payment_status: "unpaid" | "paid";
+  amount_paid: number | null;
+  change_due: number | null;
+  paid_at: string | null;
   completed_at: string | null;
   created_at: string;
 }
@@ -101,6 +104,21 @@ export interface CartItem {
   product: Product;
   quantity: number;
   notes: string;
+}
+
+export interface CashCount {
+  id: string;
+  branch_id: string;
+  staff_id: string | null;
+  staff_name: string;
+  business_date: string;
+  starting_float: number;
+  expected_cash: number;
+  counted_cash: number;
+  variance: number;
+  left_in_drawer: number | null;
+  notes: string | null;
+  created_at: string;
 }
 
 export const ORDER_STATUS_FLOW: OrderStatus[] = [

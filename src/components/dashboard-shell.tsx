@@ -11,6 +11,7 @@ import type { Branch, Staff } from "@/lib/types";
 
 const NAV = [
   { href: "", label: "Orders", icon: "🧾", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
+  { href: "/sales", label: "Sales", icon: "📊", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/menu", label: "Menu", icon: "🍔", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/tables", label: "Tables & QR", icon: "🪑", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/branches", label: "Branches", icon: "🏪", roles: ["super_admin", "tenant_admin"] },
