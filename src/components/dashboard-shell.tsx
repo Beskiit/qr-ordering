@@ -12,6 +12,8 @@ import type { Branch, Staff } from "@/lib/types";
 const NAV = [
   { href: "", label: "Orders", icon: "🧾", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
   { href: "/sales", label: "Sales", icon: "📊", roles: ["super_admin", "tenant_admin", "branch_admin"] },
+  { href: "/drawer", label: "Cash drawer", icon: "💵", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
+  { href: "/activity", label: "Activity", icon: "📜", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/menu", label: "Menu", icon: "🍔", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/tables", label: "Tables & QR", icon: "🪑", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/branches", label: "Branches", icon: "🏪", roles: ["super_admin", "tenant_admin"] },
@@ -31,6 +33,14 @@ function Shell({ children }: { children: React.ReactNode }) {
     staff.role === "tenant_admin" || staff.role === "super_admin";
 
   async function signOut() {
+    // Audit trail: must insert BEFORE signOut destroys the session.
+    await supabase.from("activity_logs").insert({
+      tenant_id: tenant.id,
+      branch_id: staff.branch_id,
+      actor_id: staff.id,
+      actor_name: staff.name,
+      action: "staff_signed_out",
+    });
     await supabase.auth.signOut();
     router.push(`/${tenant.slug}/login`);
     router.refresh();

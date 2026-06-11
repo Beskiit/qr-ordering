@@ -20,6 +20,8 @@ export default function MenuManagementPage() {
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   const load = useCallback(async () => {
     if (!branchId) return;
@@ -121,6 +123,14 @@ export default function MenuManagementPage() {
     setUploading(false);
   }
 
+  const query = search.trim().toLowerCase();
+  const visibleProducts = products.filter(
+    (p) =>
+      (!categoryFilter || p.category_id === categoryFilter) &&
+      (!query ||
+        `${p.name} ${p.description ?? ""}`.toLowerCase().includes(query))
+  );
+
   if (loading) return <Spinner label="Loading menu…" />;
 
   return (
@@ -182,11 +192,34 @@ export default function MenuManagementPage() {
           </button>
         </div>
 
+        <div className="flex gap-2 mb-4">
+          <input
+            className="input flex-1"
+            placeholder="🔍 Search products…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="input !w-auto"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {products.length === 0 ? (
           <EmptyState icon="🍔" text="No products yet." />
+        ) : visibleProducts.length === 0 ? (
+          <EmptyState icon="🔍" text="No products match your search." />
         ) : (
           <div className="flex flex-col divide-y divide-gray-100">
-            {products.map((p) => (
+            {visibleProducts.map((p) => (
               <div key={p.id} className="py-3 flex items-center gap-3">
                 {p.image_url ? (
                   <img src={p.image_url} alt={p.name} className="h-12 w-12 rounded-lg object-cover" />
@@ -207,7 +240,7 @@ export default function MenuManagementPage() {
                     p.is_available ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  {p.is_available ? "Available" : "Hidden"}
+                  {p.is_available ? "Available" : "Sold out"}
                 </button>
                 <button
                   onClick={() => setEditingProduct(p)}

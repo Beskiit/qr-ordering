@@ -35,7 +35,7 @@ export default function StaffLoginPage() {
     // Make sure this staff account belongs to THIS tenant.
     const { data: staff } = await supabase
       .from("staff")
-      .select("tenant_id, role, is_active")
+      .select("tenant_id, branch_id, name, role, is_active")
       .eq("id", data.user.id)
       .maybeSingle();
 
@@ -49,6 +49,15 @@ export default function StaffLoginPage() {
       setBusy(false);
       return;
     }
+
+    // Audit trail: record the sign-in (best effort, never blocks login).
+    await supabase.from("activity_logs").insert({
+      tenant_id: tenant.id,
+      branch_id: staff.branch_id,
+      actor_id: data.user.id,
+      actor_name: staff.name,
+      action: "staff_signed_in",
+    });
 
     router.push(`/${tenant.slug}/dashboard`);
     router.refresh();

@@ -106,6 +106,17 @@ export interface CartItem {
   notes: string;
 }
 
+export interface ActivityLog {
+  id: string;
+  tenant_id: string | null;
+  branch_id: string | null;
+  actor_id: string | null;
+  actor_name: string;
+  action: string;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface CashCount {
   id: string;
   branch_id: string;

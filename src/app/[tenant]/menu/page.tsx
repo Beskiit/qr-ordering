@@ -33,6 +33,7 @@ export default function MenuPage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [placing, setPlacing] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,7 +91,7 @@ export default function MenuPage() {
           .from("products")
           .select("*")
           .eq("branch_id", br.id)
-          .eq("is_available", true)
+          .order("is_available", { ascending: false }) // sold out sinks to the bottom
           .order("display_order"),
       ]);
       setCategories(cats ?? []);
@@ -104,6 +105,16 @@ export default function MenuPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // If an item sells out (or disappears) after it was added, drop it
+  // from the cart — place_order would reject the whole order otherwise.
+  useEffect(() => {
+    setCart((prev) =>
+      prev.filter(
+        (c) => products.find((p) => p.id === c.product.id)?.is_available
+      )
+    );
+  }, [products]);
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -139,6 +150,14 @@ export default function MenuPage() {
   );
   const cartCount = cart.reduce((sum, c) => sum + c.quantity, 0);
 
+  // Searching looks across ALL categories; otherwise show the active tab.
+  const query = search.trim().toLowerCase();
+  const visibleProducts = query
+    ? products.filter((p) =>
+        `${p.name} ${p.description ?? ""}`.toLowerCase().includes(query)
+      )
+    : products.filter((p) => p.category_id === activeCategory);
+
   async function placeOrder() {
     if (!table || cart.length === 0) return;
     setPlacing(true);
@@ -155,6 +174,9 @@ export default function MenuPage() {
     setPlacing(false);
     if (rpcError) {
       setError(rpcError.message);
+      // Likely cause: an item sold out mid-order. Refresh the menu so
+      // sold-out badges appear and the cart drops unavailable items.
+      load();
       return;
     }
     router.push(`/${tenant.slug}/track/${data.order_number}`);
@@ -179,15 +201,42 @@ export default function MenuPage() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="px-4 pb-2">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              🔍
+            </span>
+            <input
+              className="w-full rounded-full bg-gray-100 pl-9 pr-9 py-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-gray-200"
+              placeholder="Search the menu…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Category tabs */}
         {categories.length > 0 && (
           <nav className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-none">
             {categories.map((c) => (
               <button
                 key={c.id}
-                onClick={() => setActiveCategory(c.id)}
+                onClick={() => {
+                  setActiveCategory(c.id);
+                  setSearch("");
+                }}
                 className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                  activeCategory === c.id
+                  activeCategory === c.id && !search.trim()
                     ? "bg-brand text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
@@ -209,21 +258,33 @@ export default function MenuPage() {
           </p>
         )}
 
-        {products.filter((p) => p.category_id === activeCategory).length ===
-          0 && !error ? (
-          <EmptyState icon="🍽️" text="No items in this category yet." />
+        {visibleProducts.length === 0 && !error ? (
+          <EmptyState
+            icon={query ? "🔍" : "🍽️"}
+            text={
+              query
+                ? `No results for “${search.trim()}”`
+                : "No items in this category yet."
+            }
+          />
         ) : (
-          products
-            .filter((p) => p.category_id === activeCategory)
+          visibleProducts
             .map((p) => {
               const inCart = cart.find((c) => c.product.id === p.id);
               return (
-                <div key={p.id} className="card p-3 flex gap-3 items-center">
+                <div
+                  key={p.id}
+                  className={`card p-3 flex gap-3 items-center ${
+                    !p.is_available ? "opacity-60" : ""
+                  }`}
+                >
                   {p.image_url ? (
                     <img
                       src={p.image_url}
                       alt={p.name}
-                      className="h-20 w-20 rounded-xl object-cover shrink-0"
+                      className={`h-20 w-20 rounded-xl object-cover shrink-0 ${
+                        !p.is_available ? "grayscale" : ""
+                      }`}
                     />
                   ) : (
                     <div className="h-20 w-20 rounded-xl bg-gray-100 flex items-center justify-center text-2xl shrink-0">
@@ -241,7 +302,13 @@ export default function MenuPage() {
                       {formatMoney(p.price)}
                     </p>
                   </div>
-                  {table &&
+                  {!p.is_available && (
+                    <span className="shrink-0 rounded-full bg-gray-200 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-500">
+                      Sold out
+                    </span>
+                  )}
+                  {p.is_available &&
+                    table &&
                     (inCart ? (
                       <div className="flex items-center gap-2">
                         <button
