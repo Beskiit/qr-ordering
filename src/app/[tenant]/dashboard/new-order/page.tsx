@@ -22,8 +22,10 @@ import {
   DiningTable,
   CartItem,
   OrderItem,
+  Discount,
   formatMoney,
   lineUnitPrice,
+  lineTotal,
   cartKey,
 } from "@/lib/types";
 
@@ -69,6 +71,7 @@ export default function NewOrderPage() {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [addons, setAddons] = useState<ProductAddon[]>([]);
   const [tables, setTables] = useState<DiningTable[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -141,6 +144,16 @@ export default function NewOrderPage() {
             addons: chosen,
             quantity: oi.quantity,
             notes: oi.notes ?? "",
+            // Preserve any discount already on the line (from its snapshot).
+            discount: oi.discount_id
+              ? {
+                  id: oi.discount_id,
+                  tenant_id: tenant.id,
+                  name: oi.discount_name ?? "",
+                  percent: Number(oi.discount_percent) || 0,
+                  is_active: true,
+                }
+              : null,
           });
         }
         setCart(rebuilt);
@@ -159,11 +172,22 @@ export default function NewOrderPage() {
       }
     }
     setLoading(false);
-  }, [supabase, branchId, editId]);
+  }, [supabase, branchId, editId, tenant.id]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Active discounts available to apply per line.
+  useEffect(() => {
+    supabase
+      .from("discounts")
+      .select("*")
+      .eq("tenant_id", tenant.id)
+      .eq("is_active", true)
+      .order("created_at")
+      .then(({ data }) => setDiscounts((data as Discount[]) ?? []));
+  }, [supabase, tenant.id]);
 
   const variantsByProduct = useMemo(() => {
     const m = new Map<string, ProductVariant[]>();
@@ -193,7 +217,15 @@ export default function NewOrderPage() {
       }
       return [
         ...prev,
-        { key, product, variant: sel.variant, addons: sel.addons, quantity: sel.quantity, notes: "" },
+        {
+          key,
+          product,
+          variant: sel.variant,
+          addons: sel.addons,
+          quantity: sel.quantity,
+          notes: "",
+          discount: null,
+        },
       ];
     });
   }
@@ -204,7 +236,20 @@ export default function NewOrderPage() {
     );
   }
 
-  const cartTotal = cart.reduce((s, c) => s + lineUnitPrice(c) * c.quantity, 0);
+  function setLineDiscount(key: string, id: string) {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.key !== key) return c;
+        if (!id) return { ...c, discount: null };
+        const found =
+          discounts.find((d) => d.id === id) ??
+          (c.discount?.id === id ? c.discount : null);
+        return { ...c, discount: found };
+      })
+    );
+  }
+
+  const cartTotal = cart.reduce((s, c) => s + lineTotal(c), 0);
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);
 
   const query = search.trim().toLowerCase();
@@ -234,6 +279,7 @@ export default function NewOrderPage() {
       notes: c.notes,
       variant_id: c.variant?.id ?? null,
       addon_ids: c.addons.map((a) => a.id),
+      discount_id: c.discount?.id ?? null,
     }));
 
     // Edit mode: only save (and re-collect payment) if something changed.
@@ -416,38 +462,65 @@ export default function NewOrderPage() {
           ) : (
             <div className="flex flex-col divide-y divide-gray-100">
               {cart.map((c) => (
-                <div key={c.key} className="py-2 flex items-start gap-2 text-sm">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">
-                      {c.product.name}
-                      {c.variant ? ` · ${c.variant.name}` : ""}
-                    </p>
-                    {c.addons.length > 0 && (
-                      <p className="text-xs text-gray-400">
-                        + {c.addons.map((a) => a.name).join(", ")}
+                <div key={c.key} className="py-2 text-sm">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">
+                        {c.product.name}
+                        {c.variant ? ` · ${c.variant.name}` : ""}
                       </p>
-                    )}
-                    <p className="text-xs text-gray-500">
-                      {formatMoney(lineUnitPrice(c))} each
-                    </p>
+                      {c.addons.length > 0 && (
+                        <p className="text-xs text-gray-400">
+                          + {c.addons.map((a) => a.name).join(", ")}
+                        </p>
+                      )}
+                      {c.discount && (
+                        <p className="text-xs font-medium text-emerald-600">
+                          {c.discount.name} −{Number(c.discount.percent)}%
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        {formatMoney(lineUnitPrice(c))} each
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setQty(c.key, c.quantity - 1)}
+                        className="h-6 w-6 rounded-full border border-gray-300 font-bold"
+                      >
+                        −
+                      </button>
+                      <span className="w-5 text-center font-semibold">
+                        {c.quantity}
+                      </span>
+                      <button
+                        onClick={() => setQty(c.key, c.quantity + 1)}
+                        className="h-6 w-6 rounded-full bg-brand text-white font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setQty(c.key, c.quantity - 1)}
-                      className="h-6 w-6 rounded-full border border-gray-300 font-bold"
+                  {discounts.length > 0 && (
+                    <select
+                      className="input mt-1.5 text-xs"
+                      value={c.discount?.id ?? ""}
+                      onChange={(e) => setLineDiscount(c.key, e.target.value)}
                     >
-                      −
-                    </button>
-                    <span className="w-5 text-center font-semibold">
-                      {c.quantity}
-                    </span>
-                    <button
-                      onClick={() => setQty(c.key, c.quantity + 1)}
-                      className="h-6 w-6 rounded-full bg-brand text-white font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
+                      <option value="">No discount</option>
+                      {c.discount &&
+                        !discounts.some((d) => d.id === c.discount!.id) && (
+                          <option value={c.discount.id}>
+                            {c.discount.name} ({Number(c.discount.percent)}%)
+                          </option>
+                        )}
+                      {discounts.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({Number(d.percent)}%)
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               ))}
             </div>

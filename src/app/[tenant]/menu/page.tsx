@@ -182,6 +182,7 @@ export default function MenuPage() {
           addons: sel.addons,
           quantity: sel.quantity,
           notes: "",
+          discount: null,
         },
       ];
     });

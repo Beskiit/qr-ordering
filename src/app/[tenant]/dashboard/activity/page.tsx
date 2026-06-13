@@ -264,7 +264,7 @@ export default function ActivityPage() {
     );
 
   return (
-    <div className="flex flex-col gap-4 max-w-3xl w-full mx-auto">
+    <div className="flex flex-col gap-4 max-w-3xl w-full mx-auto h-full min-h-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="font-bold text-lg">
           Activity{" "}
@@ -312,6 +312,7 @@ export default function ActivityPage() {
         </div>
       )}
 
+      <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
       {loading ? (
         <Spinner label="Loading activity…" />
       ) : logs.length === 0 ? (
@@ -366,6 +367,7 @@ export default function ActivityPage() {
           )}
         </div>
       )}
+      </div>
 
       <Drawer
         open={!!selected}

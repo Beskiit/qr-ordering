@@ -17,6 +17,7 @@ import {
   Order,
   OrderItem,
   OrderStatus,
+  Discount,
 } from "@/lib/types";
 
 type OrderRow = Order & {
@@ -41,6 +42,7 @@ export default function OrdersBoard() {
   const [loading, setLoading] = useState(true);
   const [settling, setSettling] = useState<OrderRow | null>(null);
   const [selected, setSelected] = useState<OrderRow | null>(null);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
 
   const fetchOrders = useCallback(async () => {
     if (!branchId) return;
@@ -90,6 +92,33 @@ export default function OrdersBoard() {
     fetchOrders();
   }
 
+  // Active discounts the tenant offers (for per-item discounting).
+  useEffect(() => {
+    supabase
+      .from("discounts")
+      .select("*")
+      .eq("tenant_id", tenant.id)
+      .eq("is_active", true)
+      .order("created_at")
+      .then(({ data }) => setDiscounts((data as Discount[]) ?? []));
+  }, [supabase, tenant.id]);
+
+  async function applyItemDiscount(itemId: string, discountId: string | null) {
+    if (!selected) return;
+    await supabase.rpc("staff_set_item_discount", {
+      p_order_item_id: itemId,
+      p_discount_id: discountId,
+    });
+    fetchOrders();
+    // Refresh the drawer's snapshot so it shows the new totals.
+    const { data } = await supabase
+      .from("orders")
+      .select("*, order_items(*), tables(table_number)")
+      .eq("id", selected.id)
+      .maybeSingle();
+    if (data) setSelected(data as OrderRow);
+  }
+
   async function markUnpaid(order: OrderRow) {
     const ok = await confirm({
       title: `Undo payment for ${order.order_number}?`,
@@ -118,7 +147,7 @@ export default function OrdersBoard() {
   if (loading) return <Spinner label="Loading orders…" />;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 h-full min-h-0">
       <div className="flex items-center justify-between">
         <h2 className="font-bold text-lg">
           Orders{" "}
@@ -134,6 +163,7 @@ export default function OrdersBoard() {
         </Link>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
       {visible.length === 0 ? (
         <EmptyState
           icon={<ClipboardList className="h-10 w-10" />}
@@ -173,6 +203,11 @@ export default function OrdersBoard() {
                         {item.addons?.length > 0 && (
                           <span className="block text-xs text-gray-400">
                             + {item.addons.map((a) => a.name).join(", ")}
+                          </span>
+                        )}
+                        {item.discount_percent > 0 && (
+                          <span className="block text-xs text-emerald-600">
+                            −{Number(item.discount_percent)}% {item.discount_name}
                           </span>
                         )}
                         {item.notes && (
@@ -253,6 +288,7 @@ export default function OrdersBoard() {
           })}
         </div>
       )}
+      </div>
 
       {settling && (
         <PaymentDialog
@@ -276,14 +312,22 @@ export default function OrdersBoard() {
         onClose={() => setSelected(null)}
         title="Order details"
       >
-        {selected && (
-          <OrderDetailView
-            order={{
-              ...selected,
-              tableNumber: selected.tables?.table_number ?? null,
-            }}
-          />
-        )}
+        {selected &&
+          (() => {
+            const canDiscount =
+              !["completed", "cancelled"].includes(selected.order_status) &&
+              discounts.length > 0;
+            return (
+              <OrderDetailView
+                order={{
+                  ...selected,
+                  tableNumber: selected.tables?.table_number ?? null,
+                }}
+                discounts={canDiscount ? discounts : undefined}
+                onSetItemDiscount={canDiscount ? applyItemDiscount : undefined}
+              />
+            );
+          })()}
       </Drawer>
     </div>
   );

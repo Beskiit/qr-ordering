@@ -35,6 +35,8 @@ interface TrackedItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  discount_name: string | null;
+  discount_percent: number;
   notes: string | null;
 }
 
@@ -395,6 +397,11 @@ export default function TrackOrderPage() {
                 {item.addons?.length > 0 && (
                   <span className="block text-xs text-gray-400">
                     + {item.addons.map((a) => a.name).join(", ")}
+                  </span>
+                )}
+                {item.discount_percent > 0 && (
+                  <span className="block text-xs text-emerald-600">
+                    {item.discount_name} −{Number(item.discount_percent)}%
                   </span>
                 )}
                 {item.notes && (

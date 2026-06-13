@@ -142,7 +142,18 @@ export interface OrderItem {
   unit_price: number;
   quantity: number;
   subtotal: number;
+  discount_id: string | null;
+  discount_name: string | null;
+  discount_percent: number;
   notes: string | null;
+}
+
+export interface Discount {
+  id: string;
+  tenant_id: string;
+  name: string;
+  percent: number;
+  is_active: boolean;
 }
 
 export interface CartItem {
@@ -152,13 +163,21 @@ export interface CartItem {
   addons: ProductAddon[];
   quantity: number;
   notes: string;
+  discount: Discount | null;
 }
 
-/** Per-unit price = size price (or base) + selected add-ons. */
+/** Per-unit price = size price (or base) + selected add-ons (before discount). */
 export function lineUnitPrice(item: CartItem): number {
   const base = item.variant ? Number(item.variant.price) : Number(item.product.price);
   const addons = item.addons.reduce((sum, a) => sum + Number(a.price), 0);
   return base + addons;
+}
+
+/** Line total: per-unit × qty, less the line's discount. */
+export function lineTotal(item: CartItem): number {
+  const gross = lineUnitPrice(item) * item.quantity;
+  const pct = item.discount ? Number(item.discount.percent) : 0;
+  return Math.round(gross * (1 - pct / 100) * 100) / 100;
 }
 
 /** Stable signature so the same product+size+add-ons stacks into one line. */

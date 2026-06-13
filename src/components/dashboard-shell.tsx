@@ -20,6 +20,7 @@ import {
   Store,
   Users,
   CreditCard,
+  Tag,
   Settings,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ const NAV = [
   { href: "/branches", label: "Branches", icon: Store, roles: ["super_admin", "tenant_admin"] },
   { href: "/staff", label: "Staff", icon: Users, roles: ["super_admin", "tenant_admin"] },
   { href: "/payments", label: "Payment options", icon: CreditCard, roles: ["super_admin", "tenant_admin"] },
+  { href: "/discounts", label: "Discounts", icon: Tag, roles: ["super_admin", "tenant_admin"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
 ];
 
@@ -70,7 +72,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col sm:flex-row min-h-screen">
+    <div className="flex flex-col sm:flex-row h-screen overflow-hidden">
       {/* Sidebar */}
       <aside className="sm:w-60 shrink-0 bg-white border-b sm:border-b-0 sm:border-r border-gray-200 flex sm:flex-col">
         <div className="hidden sm:flex items-center gap-2.5 px-4 py-4 border-b border-gray-100">
@@ -141,7 +143,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </select>
           )}
         </header>
-        <main className="flex-1 p-5 overflow-y-auto">{children}</main>
+        <main className="flex-1 min-h-0 p-5 overflow-y-auto">{children}</main>
       </div>
     </div>
   );
