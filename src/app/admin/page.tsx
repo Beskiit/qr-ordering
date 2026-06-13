@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner, EmptyState, ErrorNote, Avatar } from "@/components/ui";
+import { useConfirm, useToast } from "@/components/feedback";
 import { Tenant } from "@/lib/types";
 
 export default function SuperAdminPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -86,8 +89,17 @@ export default function SuperAdminPage() {
 
   async function toggleActive(t: Tenant) {
     const action = t.is_active ? "Suspend" : "Restore";
-    if (!confirm(`${action} "${t.name}"?`)) return;
+    const ok = await confirm({
+      title: `${action} "${t.name}"?`,
+      message: t.is_active
+        ? "Customers won't be able to order from this restaurant until you restore it."
+        : "This restaurant will be able to take orders again.",
+      confirmLabel: action,
+      tone: t.is_active ? "danger" : "default",
+    });
+    if (!ok) return;
     await supabase.from("tenants").update({ is_active: !t.is_active }).eq("id", t.id);
+    toast(`${t.name} ${t.is_active ? "suspended" : "restored"}`);
     load();
   }
 
@@ -97,14 +109,27 @@ export default function SuperAdminPage() {
   }
 
   async function remove(t: Tenant) {
-    if (!confirm(`PERMANENTLY delete "${t.name}" and ALL its data? This cannot be undone.`))
-      return;
+    const ok = await confirm({
+      title: `Delete "${t.name}"?`,
+      message:
+        "This permanently deletes the restaurant and ALL its data — branches, menu, orders. This cannot be undone.",
+      confirmLabel: "Delete forever",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: err } = await supabase.from("tenants").delete().eq("id", t.id);
     if (err) return setError(err.message);
+    toast(`${t.name} deleted`);
     load();
   }
 
   async function signOut() {
+    const ok = await confirm({
+      title: "Log out?",
+      message: "You'll need to sign in again to manage the platform.",
+      confirmLabel: "Log out",
+    });
+    if (!ok) return;
     await supabase.auth.signOut();
     router.push("/admin/login");
   }

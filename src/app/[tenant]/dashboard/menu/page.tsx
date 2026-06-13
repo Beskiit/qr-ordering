@@ -4,12 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
+import { useConfirm, useToast } from "@/components/feedback";
 import { Category, Product, formatMoney } from "@/lib/types";
 import { randomId } from "@/lib/uid";
+
+// Editable rows for the size/add-on lists (price kept as string while typing).
+type OptionRow = { id?: string; name: string; price: string };
 
 export default function MenuManagementPage() {
   const supabase = useMemo(() => createClient(), []);
   const { branchId } = useDashboard();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +28,8 @@ export default function MenuManagementPage() {
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [editVariants, setEditVariants] = useState<OptionRow[]>([]);
+  const [editAddons, setEditAddons] = useState<OptionRow[]>([]);
 
   const load = useCallback(async () => {
     if (!branchId) return;
@@ -59,13 +67,36 @@ export default function MenuManagementPage() {
   }
 
   async function deleteCategory(c: Category) {
-    if (!confirm(`Delete "${c.name}" and all its products?`)) return;
+    const ok = await confirm({
+      title: `Delete "${c.name}"?`,
+      message: "All products in this category will be deleted too.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: err } = await supabase.from("categories").delete().eq("id", c.id);
     if (err) return setError(err.message);
+    toast(`"${c.name}" deleted`);
     load();
   }
 
   // ── Products ────────────────────────────────────────────────
+  // Open the editor and load this product's sizes + add-ons.
+  async function openEditor(p?: Product) {
+    setEditingProduct(p ?? { category_id: categories[0]?.id, is_available: true });
+    if (p?.id) {
+      const [{ data: vs }, { data: as }] = await Promise.all([
+        supabase.from("product_variants").select("*").eq("product_id", p.id).order("display_order"),
+        supabase.from("product_addons").select("*").eq("product_id", p.id).order("display_order"),
+      ]);
+      setEditVariants((vs ?? []).map((v) => ({ id: v.id, name: v.name, price: String(v.price) })));
+      setEditAddons((as ?? []).map((a) => ({ id: a.id, name: a.name, price: String(a.price) })));
+    } else {
+      setEditVariants([]);
+      setEditAddons([]);
+    }
+  }
+
   async function saveProduct(e: React.FormEvent) {
     e.preventDefault();
     if (!editingProduct || !branchId) return;
@@ -82,20 +113,66 @@ export default function MenuManagementPage() {
       is_available: editingProduct.is_available ?? true,
     };
 
-    const { error: err } = editingProduct.id
-      ? await supabase.from("products").update(payload).eq("id", editingProduct.id)
-      : await supabase.from("products").insert(payload);
+    // Upsert the product, capturing its id (needed for new products).
+    let productId = editingProduct.id;
+    if (productId) {
+      const { error: err } = await supabase.from("products").update(payload).eq("id", productId);
+      if (err) {
+        setSaving(false);
+        return setError(err.message);
+      }
+    } else {
+      const { data, error: err } = await supabase.from("products").insert(payload).select("id").single();
+      if (err || !data) {
+        setSaving(false);
+        return setError(err?.message ?? "Could not save product.");
+      }
+      productId = data.id;
+    }
+
+    // Replace sizes + add-ons (small lists; order_items snapshot names,
+    // so deleting/recreating these never affects past orders).
+    const variantRows = editVariants
+      .filter((v) => v.name.trim())
+      .map((v, i) => ({
+        product_id: productId,
+        branch_id: branchId,
+        name: v.name.trim(),
+        price: parseFloat(v.price) || 0,
+        display_order: i,
+      }));
+    const addonRows = editAddons
+      .filter((a) => a.name.trim())
+      .map((a, i) => ({
+        product_id: productId,
+        branch_id: branchId,
+        name: a.name.trim(),
+        price: parseFloat(a.price) || 0,
+        display_order: i,
+      }));
+
+    await supabase.from("product_variants").delete().eq("product_id", productId);
+    await supabase.from("product_addons").delete().eq("product_id", productId);
+    if (variantRows.length) await supabase.from("product_variants").insert(variantRows);
+    if (addonRows.length) await supabase.from("product_addons").insert(addonRows);
 
     setSaving(false);
-    if (err) return setError(err.message);
+    toast(editingProduct.id ? "Product updated" : "Product added");
     setEditingProduct(null);
     load();
   }
 
   async function deleteProduct(p: Product) {
-    if (!confirm(`Delete "${p.name}"?`)) return;
+    const ok = await confirm({
+      title: `Delete "${p.name}"?`,
+      message: "This removes the product and its sizes/add-ons from the menu.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: err } = await supabase.from("products").delete().eq("id", p.id);
     if (err) return setError(err.message);
+    toast(`"${p.name}" deleted`);
     load();
   }
 
@@ -179,12 +256,7 @@ export default function MenuManagementPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-lg">Products</h2>
           <button
-            onClick={() =>
-              setEditingProduct({
-                category_id: categories[0]?.id,
-                is_available: true,
-              })
-            }
+            onClick={() => openEditor()}
             disabled={categories.length === 0}
             className="btn-brand text-sm"
           >
@@ -243,7 +315,7 @@ export default function MenuManagementPage() {
                   {p.is_available ? "Available" : "Sold out"}
                 </button>
                 <button
-                  onClick={() => setEditingProduct(p)}
+                  onClick={() => openEditor(p)}
                   className="text-sm text-gray-500 hover:text-gray-800 px-2"
                 >
                   Edit
@@ -334,6 +406,132 @@ export default function MenuManagementPage() {
                   onChange={(e) => e.target.files?.[0] && uploadProductImage(e.target.files[0])}
                 />
               </label>
+            </div>
+
+            {/* Sizes (optional) */}
+            <div className="rounded-xl border border-gray-200 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold">
+                  Sizes{" "}
+                  <span className="text-gray-400 font-normal">
+                    · optional, customer picks one
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEditVariants((v) => [...v, { name: "", price: "" }])}
+                  className="text-xs text-brand font-semibold"
+                >
+                  + Add size
+                </button>
+              </div>
+              {editVariants.length === 0 ? (
+                <p className="text-xs text-gray-400">
+                  No sizes — the price above is used.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {editVariants.map((v, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        className="input flex-1"
+                        placeholder="e.g. Small"
+                        value={v.name}
+                        onChange={(e) =>
+                          setEditVariants((rows) =>
+                            rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r))
+                          )
+                        }
+                      />
+                      <input
+                        className="input !w-24"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Price"
+                        value={v.price}
+                        onChange={(e) =>
+                          setEditVariants((rows) =>
+                            rows.map((r, j) => (j === i ? { ...r, price: e.target.value } : r))
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditVariants((rows) => rows.filter((_, j) => j !== i))
+                        }
+                        className="text-red-400 px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add-ons (optional) */}
+            <div className="rounded-xl border border-gray-200 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold">
+                  Add-ons{" "}
+                  <span className="text-gray-400 font-normal">
+                    · optional extras
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEditAddons((a) => [...a, { name: "", price: "" }])}
+                  className="text-xs text-brand font-semibold"
+                >
+                  + Add-on
+                </button>
+              </div>
+              {editAddons.length === 0 ? (
+                <p className="text-xs text-gray-400">
+                  No add-ons for this product.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {editAddons.map((a, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        className="input flex-1"
+                        placeholder="e.g. Extra shot"
+                        value={a.name}
+                        onChange={(e) =>
+                          setEditAddons((rows) =>
+                            rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r))
+                          )
+                        }
+                      />
+                      <input
+                        className="input !w-24"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="+Price"
+                        value={a.price}
+                        onChange={(e) =>
+                          setEditAddons((rows) =>
+                            rows.map((r, j) => (j === i ? { ...r, price: e.target.value } : r))
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditAddons((rows) => rows.filter((_, j) => j !== i))
+                        }
+                        className="text-red-400 px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <ErrorNote message={error} />

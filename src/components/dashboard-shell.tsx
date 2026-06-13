@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { DashboardProvider, useDashboard } from "@/lib/dashboard-context";
 import { Avatar } from "@/components/ui";
+import { useConfirm } from "@/components/feedback";
 import type { Branch, Staff } from "@/lib/types";
 
 const NAV = [
@@ -27,12 +28,19 @@ function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const confirm = useConfirm();
 
   const base = `/${tenant.slug}/dashboard`;
   const canSwitchBranch =
     staff.role === "tenant_admin" || staff.role === "super_admin";
 
   async function signOut() {
+    const ok = await confirm({
+      title: "Log out?",
+      message: "You'll need to sign in again to manage orders.",
+      confirmLabel: "Log out",
+    });
+    if (!ok) return;
     // Audit trail: must insert BEFORE signOut destroys the session.
     await supabase.from("activity_logs").insert({
       tenant_id: tenant.id,

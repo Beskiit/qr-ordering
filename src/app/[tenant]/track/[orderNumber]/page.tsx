@@ -10,6 +10,8 @@ import { formatMoney, ORDER_STATUS_FLOW, OrderStatus } from "@/lib/types";
 
 interface TrackedItem {
   product_name: string;
+  variant_name: string | null;
+  addons: { name: string; price: number }[];
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -311,6 +313,12 @@ export default function TrackOrderPage() {
             <div key={i} className="flex justify-between text-sm">
               <span>
                 {item.quantity}× {item.product_name}
+                {item.variant_name ? ` · ${item.variant_name}` : ""}
+                {item.addons?.length > 0 && (
+                  <span className="block text-xs text-gray-400">
+                    + {item.addons.map((a) => a.name).join(", ")}
+                  </span>
+                )}
                 {item.notes && (
                   <span className="block text-xs text-gray-400">
                     “{item.notes}”

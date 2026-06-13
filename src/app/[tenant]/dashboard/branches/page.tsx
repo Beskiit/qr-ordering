@@ -5,12 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
+import { useConfirm, useToast } from "@/components/feedback";
 import { Branch } from "@/lib/types";
 
 export default function BranchesPage() {
   const supabase = useMemo(() => createClient(), []);
   const tenant = useTenant();
   const { staff } = useDashboard();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +63,7 @@ export default function BranchesPage() {
 
     setSaving(false);
     if (err) return setError(err.message);
+    toast(editing.id ? "Branch updated" : "Branch added");
     setEditing(null);
     load();
   }
@@ -70,10 +74,17 @@ export default function BranchesPage() {
   }
 
   async function remove(b: Branch) {
-    if (!confirm(`Delete branch "${b.name}"? All its menu, tables and orders will be removed.`))
-      return;
+    const ok = await confirm({
+      title: `Delete branch "${b.name}"?`,
+      message:
+        "All of this branch's menu, tables and order history will be permanently removed.",
+      confirmLabel: "Delete branch",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: err } = await supabase.from("branches").delete().eq("id", b.id);
     if (err) return setError(err.message);
+    toast(`"${b.name}" deleted`);
     load();
   }
 

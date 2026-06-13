@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Avatar, ErrorNote } from "@/components/ui";
+import { useConfirm, useToast } from "@/components/feedback";
 import { randomId } from "@/lib/uid";
 
 const PRESET_COLORS = [
@@ -19,6 +20,8 @@ export default function SettingsPage() {
   const tenant = useTenant();
   const { staff } = useDashboard();
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const canEditBranding =
     staff.role === "tenant_admin" || staff.role === "super_admin";
@@ -66,6 +69,13 @@ export default function SettingsPage() {
   }
 
   async function saveBranding() {
+    const ok = await confirm({
+      title: "Save branding changes?",
+      message:
+        "Your customers will see the new colors and logo across the menu and order tracking right away.",
+      confirmLabel: "Save branding",
+    });
+    if (!ok) return;
     setSavingBrand(true);
     setBrandErr(null);
     setBrandMsg(null);
@@ -79,7 +89,7 @@ export default function SettingsPage() {
       .eq("id", tenant.id);
     setSavingBrand(false);
     if (error) return setBrandErr(error.message);
-    setBrandMsg("Branding saved! Refreshing…");
+    toast("Branding saved");
     router.refresh();
   }
 
@@ -105,7 +115,7 @@ export default function SettingsPage() {
       .eq("id", staff.id);
     setSavingProfile(false);
     if (error) return setProfileErr(error.message);
-    setProfileMsg("Profile saved!");
+    toast("Profile saved");
     router.refresh();
   }
 

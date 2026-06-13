@@ -11,8 +11,16 @@ import {
   Category,
   DiningTable,
   Product,
+  ProductVariant,
+  ProductAddon,
   formatMoney,
+  lineUnitPrice,
+  cartKey,
 } from "@/lib/types";
+import {
+  ProductOptionsDialog,
+  OptionSelection,
+} from "@/components/product-options-dialog";
 
 export default function MenuPage() {
   const tenant = useTenant();
@@ -27,6 +35,8 @@ export default function MenuPage() {
   const [table, setTable] = useState<DiningTable | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [addons, setAddons] = useState<ProductAddon[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -34,6 +44,7 @@ export default function MenuPage() {
   const [customerName, setCustomerName] = useState("");
   const [placing, setPlacing] = useState(false);
   const [search, setSearch] = useState("");
+  const [optionsFor, setOptionsFor] = useState<Product | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,22 +91,35 @@ export default function MenuPage() {
       }
       setBranch(br);
 
-      const [{ data: cats }, { data: prods }] = await Promise.all([
-        supabase
-          .from("categories")
-          .select("*")
-          .eq("branch_id", br.id)
-          .eq("is_active", true)
-          .order("display_order"),
-        supabase
-          .from("products")
-          .select("*")
-          .eq("branch_id", br.id)
-          .order("is_available", { ascending: false }) // sold out sinks to the bottom
-          .order("display_order"),
-      ]);
+      const [{ data: cats }, { data: prods }, { data: vars }, { data: adds }] =
+        await Promise.all([
+          supabase
+            .from("categories")
+            .select("*")
+            .eq("branch_id", br.id)
+            .eq("is_active", true)
+            .order("display_order"),
+          supabase
+            .from("products")
+            .select("*")
+            .eq("branch_id", br.id)
+            .order("is_available", { ascending: false }) // sold out sinks to the bottom
+            .order("display_order"),
+          supabase
+            .from("product_variants")
+            .select("*")
+            .eq("branch_id", br.id)
+            .order("display_order"),
+          supabase
+            .from("product_addons")
+            .select("*")
+            .eq("branch_id", br.id)
+            .order("display_order"),
+        ]);
       setCategories(cats ?? []);
       setProducts(prods ?? []);
+      setVariants(vars ?? []);
+      setAddons(adds ?? []);
       setActiveCategory(cats?.[0]?.id ?? null);
     } finally {
       setLoading(false);
@@ -116,36 +140,66 @@ export default function MenuPage() {
     );
   }, [products]);
 
-  function addToCart(product: Product) {
+  // Group options by product for quick lookup.
+  const variantsByProduct = useMemo(() => {
+    const m = new Map<string, ProductVariant[]>();
+    variants.forEach((v) => m.set(v.product_id, [...(m.get(v.product_id) ?? []), v]));
+    return m;
+  }, [variants]);
+  const addonsByProduct = useMemo(() => {
+    const m = new Map<string, ProductAddon[]>();
+    addons.forEach((a) => m.set(a.product_id, [...(m.get(a.product_id) ?? []), a]));
+    return m;
+  }, [addons]);
+  const hasOptions = useCallback(
+    (p: Product) =>
+      (variantsByProduct.get(p.id)?.length ?? 0) > 0 ||
+      (addonsByProduct.get(p.id)?.length ?? 0) > 0,
+    [variantsByProduct, addonsByProduct]
+  );
+
+  // Add a specific size/add-on combination; identical combos stack.
+  function addSelection(product: Product, sel: OptionSelection) {
+    const key = cartKey(
+      product.id,
+      sel.variant?.id ?? null,
+      sel.addons.map((a) => a.id)
+    );
     setCart((prev) => {
-      const existing = prev.find((c) => c.product.id === product.id);
+      const existing = prev.find((c) => c.key === key);
       if (existing) {
         return prev.map((c) =>
-          c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c
+          c.key === key ? { ...c, quantity: c.quantity + sel.quantity } : c
         );
       }
-      return [...prev, { product, quantity: 1, notes: "" }];
+      return [
+        ...prev,
+        {
+          key,
+          product,
+          variant: sel.variant,
+          addons: sel.addons,
+          quantity: sel.quantity,
+          notes: "",
+        },
+      ];
     });
   }
 
-  function setQty(productId: string, qty: number) {
+  function setQty(key: string, qty: number) {
     setCart((prev) =>
       qty <= 0
-        ? prev.filter((c) => c.product.id !== productId)
-        : prev.map((c) =>
-            c.product.id === productId ? { ...c, quantity: qty } : c
-          )
+        ? prev.filter((c) => c.key !== key)
+        : prev.map((c) => (c.key === key ? { ...c, quantity: qty } : c))
     );
   }
 
-  function setNotes(productId: string, notes: string) {
-    setCart((prev) =>
-      prev.map((c) => (c.product.id === productId ? { ...c, notes } : c))
-    );
+  function setNotes(key: string, notes: string) {
+    setCart((prev) => prev.map((c) => (c.key === key ? { ...c, notes } : c)));
   }
 
   const cartTotal = cart.reduce(
-    (sum, c) => sum + Number(c.product.price) * c.quantity,
+    (sum, c) => sum + lineUnitPrice(c) * c.quantity,
     0
   );
   const cartCount = cart.reduce((sum, c) => sum + c.quantity, 0);
@@ -168,6 +222,8 @@ export default function MenuPage() {
         product_id: c.product.id,
         quantity: c.quantity,
         notes: c.notes,
+        variant_id: c.variant?.id ?? null,
+        addon_ids: c.addons.map((a) => a.id),
       })),
       p_customer_name: customerName || null,
     });
@@ -270,7 +326,12 @@ export default function MenuPage() {
         ) : (
           visibleProducts
             .map((p) => {
-              const inCart = cart.find((c) => c.product.id === p.id);
+              const plainKey = cartKey(p.id, null, []);
+              const inCart = cart.find((c) => c.key === plainKey);
+              const optioned = hasOptions(p);
+              const qtyInCart = cart
+                .filter((c) => c.product.id === p.id)
+                .reduce((s, c) => s + c.quantity, 0);
               return (
                 <div
                   key={p.id}
@@ -299,7 +360,15 @@ export default function MenuPage() {
                       </p>
                     )}
                     <p className="mt-1 font-bold text-brand">
-                      {formatMoney(p.price)}
+                      {variantsByProduct.get(p.id)?.length
+                        ? `from ${formatMoney(
+                            Math.min(
+                              ...variantsByProduct
+                                .get(p.id)!
+                                .map((v) => Number(v.price))
+                            )
+                          )}`
+                        : formatMoney(p.price)}
                     </p>
                   </div>
                   {!p.is_available && (
@@ -309,10 +378,17 @@ export default function MenuPage() {
                   )}
                   {p.is_available &&
                     table &&
-                    (inCart ? (
+                    (optioned ? (
+                      <button
+                        onClick={() => setOptionsFor(p)}
+                        className="relative h-9 px-3 rounded-full bg-brand text-white text-sm font-semibold shrink-0"
+                      >
+                        {qtyInCart > 0 ? `${qtyInCart} ·` : ""} Add
+                      </button>
+                    ) : inCart ? (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setQty(p.id, inCart.quantity - 1)}
+                          onClick={() => setQty(plainKey, inCart.quantity - 1)}
                           className="h-8 w-8 rounded-full border border-gray-300 font-bold hover:bg-gray-50"
                         >
                           −
@@ -321,7 +397,7 @@ export default function MenuPage() {
                           {inCart.quantity}
                         </span>
                         <button
-                          onClick={() => setQty(p.id, inCart.quantity + 1)}
+                          onClick={() => setQty(plainKey, inCart.quantity + 1)}
                           className="h-8 w-8 rounded-full bg-brand text-white font-bold"
                         >
                           +
@@ -329,7 +405,13 @@ export default function MenuPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => addToCart(p)}
+                        onClick={() =>
+                          addSelection(p, {
+                            variant: null,
+                            addons: [],
+                            quantity: 1,
+                          })
+                        }
                         className="h-9 w-9 rounded-full bg-brand text-white text-xl font-bold shrink-0"
                         aria-label={`Add ${p.name}`}
                       >
@@ -379,17 +461,25 @@ export default function MenuPage() {
 
             <div className="flex flex-col gap-4">
               {cart.map((c) => (
-                <div key={c.product.id} className="border-b border-gray-100 pb-3">
+                <div key={c.key} className="border-b border-gray-100 pb-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{c.product.name}</p>
+                      <p className="font-semibold truncate">
+                        {c.product.name}
+                        {c.variant ? ` · ${c.variant.name}` : ""}
+                      </p>
+                      {c.addons.length > 0 && (
+                        <p className="text-xs text-gray-500 truncate">
+                          + {c.addons.map((a) => a.name).join(", ")}
+                        </p>
+                      )}
                       <p className="text-sm text-gray-500">
-                        {formatMoney(c.product.price)} ×&nbsp;{c.quantity}
+                        {formatMoney(lineUnitPrice(c))} ×&nbsp;{c.quantity}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setQty(c.product.id, c.quantity - 1)}
+                        onClick={() => setQty(c.key, c.quantity - 1)}
                         className="h-7 w-7 rounded-full border border-gray-300 font-bold"
                       >
                         −
@@ -398,7 +488,7 @@ export default function MenuPage() {
                         {c.quantity}
                       </span>
                       <button
-                        onClick={() => setQty(c.product.id, c.quantity + 1)}
+                        onClick={() => setQty(c.key, c.quantity + 1)}
                         className="h-7 w-7 rounded-full bg-brand text-white font-bold"
                       >
                         +
@@ -409,7 +499,7 @@ export default function MenuPage() {
                     className="input mt-2 text-sm"
                     placeholder="Special requests (optional)"
                     value={c.notes}
-                    onChange={(e) => setNotes(c.product.id, e.target.value)}
+                    onChange={(e) => setNotes(c.key, e.target.value)}
                   />
                 </div>
               ))}
@@ -438,6 +528,21 @@ export default function MenuPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Size / add-on picker */}
+      {optionsFor && (
+        <ProductOptionsDialog
+          product={optionsFor}
+          variants={variantsByProduct.get(optionsFor.id) ?? []}
+          addons={addonsByProduct.get(optionsFor.id) ?? []}
+          addLabel="Add to cart"
+          onClose={() => setOptionsFor(null)}
+          onAdd={(sel) => {
+            addSelection(optionsFor, sel);
+            setOptionsFor(null);
+          }}
+        />
       )}
     </div>
   );

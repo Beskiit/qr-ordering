@@ -62,6 +62,24 @@ export interface Product {
   display_order: number;
 }
 
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  branch_id: string;
+  name: string;
+  price: number;
+  display_order: number;
+}
+
+export interface ProductAddon {
+  id: string;
+  product_id: string;
+  branch_id: string;
+  name: string;
+  price: number;
+  display_order: number;
+}
+
 export interface DiningTable {
   id: string;
   branch_id: string;
@@ -74,7 +92,7 @@ export interface DiningTable {
 export interface Order {
   id: string;
   branch_id: string;
-  table_id: string;
+  table_id: string | null;
   order_number: string;
   order_status: OrderStatus;
   customer_name: string | null;
@@ -89,11 +107,18 @@ export interface Order {
   created_at: string;
 }
 
+export interface OrderItemAddon {
+  name: string;
+  price: number;
+}
+
 export interface OrderItem {
   id: string;
   order_id: string;
   product_id: string;
   product_name: string;
+  variant_name: string | null;
+  addons: OrderItemAddon[];
   unit_price: number;
   quantity: number;
   subtotal: number;
@@ -101,9 +126,28 @@ export interface OrderItem {
 }
 
 export interface CartItem {
+  key: string; // product + variant + add-ons signature; identical combos stack
   product: Product;
+  variant: ProductVariant | null;
+  addons: ProductAddon[];
   quantity: number;
   notes: string;
+}
+
+/** Per-unit price = size price (or base) + selected add-ons. */
+export function lineUnitPrice(item: CartItem): number {
+  const base = item.variant ? Number(item.variant.price) : Number(item.product.price);
+  const addons = item.addons.reduce((sum, a) => sum + Number(a.price), 0);
+  return base + addons;
+}
+
+/** Stable signature so the same product+size+add-ons stacks into one line. */
+export function cartKey(
+  productId: string,
+  variantId: string | null,
+  addonIds: string[]
+): string {
+  return `${productId}|${variantId ?? ""}|${[...addonIds].sort().join(",")}`;
 }
 
 export interface ActivityLog {

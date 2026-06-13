@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote, Avatar } from "@/components/ui";
+import { useConfirm, useToast } from "@/components/feedback";
 import { Staff } from "@/lib/types";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -17,6 +18,8 @@ export default function StaffPage() {
   const supabase = useMemo(() => createClient(), []);
   const tenant = useTenant();
   const { staff: me, branches } = useDashboard();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +65,7 @@ export default function StaffPage() {
     if (!res.ok) return setError(json.error ?? "Failed to create staff.");
     setCreating(false);
     setForm({ name: "", email: "", password: "", role: "branch_staff", branch_id: "" });
+    toast("Staff member added");
     load();
   }
 
@@ -71,10 +75,17 @@ export default function StaffPage() {
   }
 
   async function remove(s: Staff) {
-    if (!confirm(`Remove ${s.name}'s account? They will no longer be able to sign in.`)) return;
+    const ok = await confirm({
+      title: `Remove ${s.name}?`,
+      message: "Their account will be deleted and they'll no longer be able to sign in.",
+      confirmLabel: "Remove",
+      tone: "danger",
+    });
+    if (!ok) return;
     const res = await fetch(`/api/staff?id=${s.id}`, { method: "DELETE" });
     const json = await res.json();
     if (!res.ok) return setError(json.error ?? "Failed to delete.");
+    toast(`${s.name} removed`);
     load();
   }
 

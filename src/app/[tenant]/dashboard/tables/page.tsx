@@ -6,12 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 import { useDashboard } from "@/lib/dashboard-context";
 import { useTenant } from "@/lib/tenant-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
+import { useConfirm, useToast } from "@/components/feedback";
 import { DiningTable } from "@/lib/types";
 
 export default function TablesPage() {
   const supabase = useMemo(() => createClient(), []);
   const tenant = useTenant();
   const { branchId } = useDashboard();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
@@ -69,13 +72,21 @@ export default function TablesPage() {
     });
     if (err) return setError(err.message);
     setNewTable({ table_number: "", capacity: 4 });
+    toast(`Table added`);
     load();
   }
 
   async function deleteTable(t: DiningTable) {
-    if (!confirm(`Delete table ${t.table_number}? Its QR code will stop working.`)) return;
+    const ok = await confirm({
+      title: `Delete table ${t.table_number}?`,
+      message: "Its QR code will stop working immediately.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error: err } = await supabase.from("tables").delete().eq("id", t.id);
     if (err) return setError(err.message);
+    toast(`Table ${t.table_number} deleted`);
     load();
   }
 
