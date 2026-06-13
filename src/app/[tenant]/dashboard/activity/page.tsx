@@ -57,6 +57,7 @@ function fmtDetail(key: string, value: unknown): string {
 const ACTION_LABELS: Record<string, string> = {
   order_placed: "Order placed",
   order_status_changed: "Order status changed",
+  order_edited: "Order edited",
   payment_settled: "Payment settled",
   payment_undone: "Payment undone",
   drawer_closed: "Drawer closed",
@@ -86,7 +87,7 @@ const PAY_SUBFILTERS: { key: "all" | PaymentChoice; label: string }[] = [
 type FilterKey = (typeof FILTERS)[number]["key"];
 
 const FILTER_ACTIONS: Record<Exclude<FilterKey, "all">, string[]> = {
-  orders: ["order_placed", "order_status_changed"],
+  orders: ["order_placed", "order_status_changed", "order_edited"],
   payments: ["payment_settled", "payment_undone"],
   drawer: ["drawer_closed", "cash_in", "cash_out"],
   sessions: ["staff_signed_in", "staff_signed_out"],
@@ -103,6 +104,11 @@ function describe(log: ActivityLog): { icon: string; text: string } {
       };
     case "order_status_changed":
       return { icon: "🔄", text: `Order ${num}: ${d.from} → ${d.to}` };
+    case "order_edited":
+      return {
+        icon: "✏️",
+        text: `Order ${num} edited · ${formatMoney(Number(d.total) || 0)}`,
+      };
     case "payment_settled": {
       const method = typeof d.method === "string" ? d.method : "counter";
       if (method !== "counter") {

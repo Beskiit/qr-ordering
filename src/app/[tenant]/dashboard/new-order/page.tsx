@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
 import { PaymentDialog } from "@/components/payment-dialog";
+import { useConfirm, useToast } from "@/components/feedback";
 import {
   ProductOptionsDialog,
   OptionSelection,
@@ -19,16 +20,29 @@ import {
   ProductAddon,
   DiningTable,
   CartItem,
+  OrderItem,
   formatMoney,
   lineUnitPrice,
   cartKey,
 } from "@/lib/types";
 
+// Signature of the cart's contents — to tell whether an edit changed anything.
+function cartSignature(items: CartItem[]): string {
+  return items
+    .map((c) => `${c.key}x${c.quantity}|${c.notes.trim()}`)
+    .sort()
+    .join(";");
+}
+
 export default function NewOrderPage() {
   const supabase = useMemo(() => createClient(), []);
   const tenant = useTenant();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit"); // editing an existing order?
   const { branchId } = useDashboard();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -52,6 +66,13 @@ export default function NewOrderPage() {
     number: string;
     total: number;
   } | null>(null);
+  // When editing, the order we're editing (for the banner) + change tracking.
+  const [editInfo, setEditInfo] = useState<{
+    number: string;
+    destLabel: string;
+    wasPaid: boolean;
+  } | null>(null);
+  const [originalSig, setOriginalSig] = useState("");
 
   const load = useCallback(async () => {
     if (!branchId) return;
@@ -64,13 +85,62 @@ export default function NewOrderPage() {
         supabase.from("product_addons").select("*").eq("branch_id", branchId).order("display_order"),
         supabase.from("tables").select("*").eq("branch_id", branchId).eq("is_active", true).order("table_number"),
       ]);
+    const prodList = prods ?? [];
+    const varList = vars ?? [];
+    const addList = adds ?? [];
+    const tblList = tbls ?? [];
     setCategories(cats ?? []);
-    setProducts(prods ?? []);
-    setVariants(vars ?? []);
-    setAddons(adds ?? []);
-    setTables(tbls ?? []);
+    setProducts(prodList);
+    setVariants(varList);
+    setAddons(addList);
+    setTables(tblList);
+
+    // Editing an existing order: rebuild the cart from its items.
+    if (editId) {
+      const { data: ord } = await supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("id", editId)
+        .maybeSingle();
+      if (ord) {
+        const items = (ord.order_items ?? []) as OrderItem[];
+        const rebuilt: CartItem[] = [];
+        for (const oi of items) {
+          const product = prodList.find((p) => p.id === oi.product_id);
+          if (!product) continue; // product removed/unavailable — skip
+          const pVariants = varList.filter((v) => v.product_id === product.id);
+          const pAddons = addList.filter((a) => a.product_id === product.id);
+          const variant = oi.variant_name
+            ? pVariants.find((v) => v.name === oi.variant_name) ?? null
+            : null;
+          const names = (oi.addons ?? []).map((a) => a.name);
+          const chosen = pAddons.filter((a) => names.includes(a.name));
+          rebuilt.push({
+            key: cartKey(product.id, variant?.id ?? null, chosen.map((a) => a.id)),
+            product,
+            variant,
+            addons: chosen,
+            quantity: oi.quantity,
+            notes: oi.notes ?? "",
+          });
+        }
+        setCart(rebuilt);
+        setOriginalSig(cartSignature(rebuilt));
+        setEditInfo({
+          number: ord.order_number,
+          wasPaid: ord.payment_status === "paid",
+          destLabel: ord.table_id
+            ? `Table ${tblList.find((t) => t.id === ord.table_id)?.table_number ?? ""}`
+            : ord.order_type === "pickup"
+            ? "Pickup"
+            : ord.order_type === "delivery"
+            ? "Delivery"
+            : "Walk-in",
+        });
+      }
+    }
     setLoading(false);
-  }, [supabase, branchId]);
+  }, [supabase, branchId, editId]);
 
   useEffect(() => {
     load();
@@ -139,18 +209,51 @@ export default function NewOrderPage() {
 
   async function createOrder() {
     if (!branchId || cart.length === 0) return;
+    const items = cart.map((c) => ({
+      product_id: c.product.id,
+      quantity: c.quantity,
+      notes: c.notes,
+      variant_id: c.variant?.id ?? null,
+      addon_ids: c.addons.map((a) => a.id),
+    }));
+
+    // Edit mode: only save (and re-collect payment) if something changed.
+    if (editId) {
+      if (cartSignature(cart) === originalSig) {
+        toast("No changes made");
+        router.push(`/${tenant.slug}/dashboard`);
+        return;
+      }
+      const ok = await confirm({
+        title: "Save changes to this order?",
+        message: editInfo?.wasPaid
+          ? "This order was already paid — saving the changes marks it unpaid so you can collect the new total."
+          : "The order will be updated with the new items and total.",
+        confirmLabel: "Save changes",
+      });
+      if (!ok) return;
+      setCreating(true);
+      setError(null);
+      const { error: rpcErr } = await supabase.rpc("staff_update_order_items", {
+        p_order_id: editId,
+        p_items: items,
+      });
+      setCreating(false);
+      if (rpcErr) {
+        setError(rpcErr.message ?? "Could not save changes.");
+        return;
+      }
+      toast("Order updated");
+      router.push(`/${tenant.slug}/dashboard`);
+      return;
+    }
+
     setCreating(true);
     setError(null);
     const { data, error: rpcErr } = await supabase.rpc("staff_create_order", {
       p_branch_id: branchId,
       p_table_id: tableIdVal,
-      p_items: cart.map((c) => ({
-        product_id: c.product.id,
-        quantity: c.quantity,
-        notes: c.notes,
-        variant_id: c.variant?.id ?? null,
-        addon_ids: c.addons.map((a) => a.id),
-      })),
+      p_items: items,
       p_customer_name: customerName || null,
       p_order_type: orderType,
     });
@@ -167,7 +270,14 @@ export default function NewOrderPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-bold text-lg">New order</h2>
+        <h2 className="font-bold text-lg">
+          {editId ? "Edit order" : "New order"}
+          {editInfo && (
+            <span className="ml-2 text-sm font-normal text-gray-400">
+              {editInfo.number} · {editInfo.destLabel}
+            </span>
+          )}
+        </h2>
         <Link
           href={`/${tenant.slug}/dashboard`}
           className="text-sm text-gray-500 hover:text-gray-800"
@@ -237,27 +347,33 @@ export default function NewOrderPage() {
 
         {/* Cart / ticket */}
         <div className="card p-4 flex flex-col gap-3 lg:sticky lg:top-4">
-          <div>
-            <label className="text-sm font-medium">For</label>
-            <select
-              className="input mt-1"
-              value={dest}
-              onChange={(e) => setDest(e.target.value)}
-            >
-              <option value="">Walk-in / Counter</option>
-              <option value="pickup">Pickup</option>
-              <option value="delivery">Delivery</option>
-              {tables.length > 0 && (
-                <optgroup label="Dine-in (table)">
-                  {tables.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      Table {t.table_number}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
+          {editId ? (
+            <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              Editing <b>{editInfo?.number}</b> · {editInfo?.destLabel}
+            </div>
+          ) : (
+            <div>
+              <label className="text-sm font-medium">For</label>
+              <select
+                className="input mt-1"
+                value={dest}
+                onChange={(e) => setDest(e.target.value)}
+              >
+                <option value="">Walk-in / Counter</option>
+                <option value="pickup">Pickup</option>
+                <option value="delivery">Delivery</option>
+                {tables.length > 0 && (
+                  <optgroup label="Dine-in (table)">
+                    {tables.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        Table {t.table_number}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
 
           {cart.length === 0 ? (
             <p className="text-sm text-gray-400 py-6 text-center">
@@ -303,12 +419,14 @@ export default function NewOrderPage() {
             </div>
           )}
 
-          <input
-            className="input"
-            placeholder="Customer name (optional)"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-          />
+          {!editId && (
+            <input
+              className="input"
+              placeholder="Customer name (optional)"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+            />
+          )}
 
           <div className="flex items-center justify-between font-bold">
             <span>Total</span>
@@ -323,7 +441,9 @@ export default function NewOrderPage() {
             className="btn-brand w-full py-3 disabled:opacity-40"
           >
             {creating
-              ? "Creating…"
+              ? "Saving…"
+              : editId
+              ? `Save changes · ${cartCount} item${cartCount === 1 ? "" : "s"}`
               : `Create & take payment · ${cartCount} item${
                   cartCount === 1 ? "" : "s"
                 }`}

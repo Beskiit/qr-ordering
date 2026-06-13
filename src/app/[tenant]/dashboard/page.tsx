@@ -228,6 +228,12 @@ export default function OrdersBoard() {
                       {action[1]}
                     </button>
                   )}
+                  <Link
+                    href={`/${tenant.slug}/dashboard/new-order?edit=${o.id}`}
+                    className="rounded-[0.625rem] border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Edit
+                  </Link>
                   {!["completed", "cancelled"].includes(o.order_status) && (
                     <button
                       onClick={() => setStatus(o, "cancelled")}
