@@ -180,6 +180,17 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export interface CashMovement {
+  id: string;
+  branch_id: string;
+  staff_id: string | null;
+  staff_name: string;
+  direction: "in" | "out";
+  amount: number;
+  reason: string | null;
+  created_at: string;
+}
+
 export type PaymentMethodType = "gcash" | "maya" | "bank";
 
 export interface PaymentMethod {

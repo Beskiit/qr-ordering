@@ -25,7 +25,7 @@ const PAGE_SIZE = 50;
 
 const MONEY_KEYS = new Set([
   "total", "amount_paid", "change_due", "starting_float",
-  "counted_cash", "expected_cash", "variance", "left_in_drawer",
+  "counted_cash", "expected_cash", "variance", "left_in_drawer", "amount",
 ]);
 
 const DETAIL_LABELS: Record<string, string> = {
@@ -36,6 +36,9 @@ const DETAIL_LABELS: Record<string, string> = {
   from: "From",
   to: "To",
   method: "Method",
+  amount: "Amount",
+  reason: "Reason",
+  direction: "Direction",
   starting_float: "Starting float",
   counted_cash: "Counted",
   expected_cash: "Expected cash",
@@ -57,6 +60,8 @@ const ACTION_LABELS: Record<string, string> = {
   payment_settled: "Payment settled",
   payment_undone: "Payment undone",
   drawer_closed: "Drawer closed",
+  cash_in: "Cash in",
+  cash_out: "Cash out",
   staff_signed_in: "Signed in",
   staff_signed_out: "Signed out",
 };
@@ -83,7 +88,7 @@ type FilterKey = (typeof FILTERS)[number]["key"];
 const FILTER_ACTIONS: Record<Exclude<FilterKey, "all">, string[]> = {
   orders: ["order_placed", "order_status_changed"],
   payments: ["payment_settled", "payment_undone"],
-  drawer: ["drawer_closed"],
+  drawer: ["drawer_closed", "cash_in", "cash_out"],
   sessions: ["staff_signed_in", "staff_signed_out"],
 };
 
@@ -138,6 +143,20 @@ function describe(log: ActivityLog): { icon: string; text: string } {
         )}${left} — ${verdict}`,
       };
     }
+    case "cash_in":
+      return {
+        icon: "📥",
+        text: `Cash in ${formatMoney(Number(d.amount) || 0)}${
+          d.reason ? ` · ${d.reason}` : ""
+        }`,
+      };
+    case "cash_out":
+      return {
+        icon: "📤",
+        text: `Cash out ${formatMoney(Number(d.amount) || 0)}${
+          d.reason ? ` · ${d.reason}` : ""
+        }`,
+      };
     case "staff_signed_in":
       return { icon: "🔓", text: "Signed in" };
     case "staff_signed_out":
