@@ -13,6 +13,7 @@ import {
   ProductOptionsDialog,
   OptionSelection,
 } from "@/components/product-options-dialog";
+import { UtensilsCrossed } from "lucide-react";
 import {
   Category,
   Product,
@@ -32,6 +33,24 @@ function cartSignature(items: CartItem[]): string {
     .map((c) => `${c.key}x${c.quantity}|${c.notes.trim()}`)
     .sort()
     .join(";");
+}
+
+// Tint a card with the category color (~60% over white) and pick a text
+// color that stays readable — dark text on light fills, white on dark ones.
+function cardTint(hex: string): React.CSSProperties | undefined {
+  const h = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return undefined;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const mix = (c: number) => Math.round(c * 0.6 + 255 * 0.4); // 60% color
+  const [br, bg, bb] = [mix(r), mix(g), mix(b)];
+  const luminance = (0.299 * br + 0.587 * bg + 0.114 * bb) / 255;
+  return {
+    backgroundColor: `rgb(${br}, ${bg}, ${bb})`,
+    borderColor: hex,
+    color: luminance > 0.6 ? "#1f2937" : "#ffffff",
+  };
 }
 
 export default function NewOrderPage() {
@@ -292,7 +311,7 @@ export default function NewOrderPage() {
           <div className="flex gap-2">
             <input
               className="input flex-1"
-              placeholder="🔍 Search products…"
+              placeholder="Search products…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -311,7 +330,10 @@ export default function NewOrderPage() {
           </div>
 
           {visibleProducts.length === 0 ? (
-            <EmptyState icon="🍽️" text="No matching products." />
+            <EmptyState
+              icon={<UtensilsCrossed className="h-10 w-10" />}
+              text="No matching products."
+            />
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {visibleProducts.map((p) => {
@@ -319,6 +341,9 @@ export default function NewOrderPage() {
                 const priceLabel = vs?.length
                   ? `from ${formatMoney(Math.min(...vs.map((v) => Number(v.price))))}`
                   : formatMoney(p.price);
+                const catColor = categories.find(
+                  (c) => c.id === p.category_id
+                )?.color;
                 return (
                   <button
                     key={p.id}
@@ -327,14 +352,23 @@ export default function NewOrderPage() {
                         ? setOptionsFor(p)
                         : addSelection(p, { variant: null, addons: [], quantity: 1 })
                     }
+                    style={catColor ? cardTint(catColor) : undefined}
                     className="card p-3 text-left hover:border-brand transition flex flex-col"
                   >
                     <span className="font-semibold leading-tight">{p.name}</span>
-                    <span className="mt-1 text-sm font-bold text-brand">
+                    <span
+                      className={`mt-1 text-sm font-bold ${
+                        catColor ? "" : "text-brand"
+                      }`}
+                    >
                       {priceLabel}
                     </span>
                     {hasOptions(p) && (
-                      <span className="mt-0.5 text-xs text-gray-400">
+                      <span
+                        className={`mt-0.5 text-xs ${
+                          catColor ? "opacity-70" : "text-gray-400"
+                        }`}
+                      >
                         Options →
                       </span>
                     )}

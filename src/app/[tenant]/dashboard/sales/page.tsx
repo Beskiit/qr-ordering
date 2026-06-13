@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState } from "@/components/ui";
+import { Lock, BarChart3 } from "lucide-react";
 import { formatMoney, Order, OrderItem } from "@/lib/types";
 import {
   Area,
@@ -125,7 +126,12 @@ export default function SalesPage() {
     }, [orders, range]);
 
   if (!isAllowed)
-    return <EmptyState icon="🔒" text="Only admins can view sales reports." />;
+    return (
+      <EmptyState
+        icon={<Lock className="h-10 w-10" />}
+        text="Only admins can view sales reports."
+      />
+    );
   if (loading) return <Spinner label="Crunching the numbers…" />;
 
   const stats: [string, string][] = [
@@ -173,7 +179,7 @@ export default function SalesPage() {
 
       {orders.length === 0 ? (
         <EmptyState
-          icon="📊"
+          icon={<BarChart3 className="h-10 w-10" />}
           text="No paid orders in this period yet. Settle a payment on the Orders board and it shows up here."
         />
       ) : (

@@ -10,6 +10,7 @@ import { PaymentDialog } from "@/components/payment-dialog";
 import { Drawer } from "@/components/drawer";
 import { OrderDetailView } from "@/components/order-detail";
 import { useConfirm } from "@/components/feedback";
+import { ClipboardList, Banknote, StickyNote } from "lucide-react";
 import {
   formatMoney,
   orderDestination,
@@ -134,7 +135,10 @@ export default function OrdersBoard() {
       </div>
 
       {visible.length === 0 ? (
-        <EmptyState icon="🧾" text="No orders yet. They'll appear here the moment a customer orders." />
+        <EmptyState
+          icon={<ClipboardList className="h-10 w-10" />}
+          text="No orders yet. They'll appear here the moment a customer orders."
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((o) => {
@@ -172,8 +176,9 @@ export default function OrdersBoard() {
                           </span>
                         )}
                         {item.notes && (
-                          <span className="block text-xs text-amber-600">
-                            📝 {item.notes}
+                          <span className="flex items-center gap-1 text-xs text-amber-600">
+                            <StickyNote className="h-3 w-3 shrink-0" />
+                            {item.notes}
                           </span>
                         )}
                       </span>
@@ -202,9 +207,9 @@ export default function OrdersBoard() {
                   ) : (
                     <button
                       onClick={() => setSettling(o)}
-                      className="text-xs rounded-full px-2.5 py-1 font-semibold bg-brand text-white"
+                      className="text-xs rounded-full px-2.5 py-1 font-semibold bg-brand text-white inline-flex items-center gap-1"
                     >
-                      💵 Take payment
+                      <Banknote className="h-3.5 w-3.5" /> Take payment
                     </button>
                   )}
                 </div>

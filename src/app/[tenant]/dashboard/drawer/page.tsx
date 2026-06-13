@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useDashboard } from "@/lib/dashboard-context";
 import { EmptyState, ErrorNote } from "@/components/ui";
 import { useToast } from "@/components/feedback";
+import { Banknote } from "lucide-react";
 import { formatMoney, CashCount, CashMovement } from "@/lib/types";
 
 function VarianceBadge({ v }: { v: number }) {
@@ -306,7 +307,7 @@ export default function CashDrawerPage() {
 
       {closings.length === 0 ? (
         <EmptyState
-          icon="💵"
+          icon={<Banknote className="h-10 w-10" />}
           text="No closings yet. Tap “Close the day” at the end of the shift."
         />
       ) : (

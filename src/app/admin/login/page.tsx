@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ErrorNote } from "@/components/ui";
+import { ShieldCheck } from "lucide-react";
 
 export default function SuperAdminLoginPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -50,7 +51,7 @@ export default function SuperAdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-gray-900">
       <div className="card w-full max-w-sm p-8">
         <div className="text-center mb-6">
-          <div className="text-3xl">🛡️</div>
+          <ShieldCheck className="h-8 w-8 mx-auto text-[var(--brand)]" />
           <h1 className="mt-2 font-bold text-xl">Super Admin</h1>
           <p className="text-sm text-gray-500">Platform management</p>
         </div>

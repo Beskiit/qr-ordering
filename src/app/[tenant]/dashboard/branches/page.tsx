@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
+import { Lock, Store } from "lucide-react";
 import { Branch } from "@/lib/types";
 
 export default function BranchesPage() {
@@ -89,7 +90,12 @@ export default function BranchesPage() {
   }
 
   if (!isAllowed)
-    return <EmptyState icon="🔒" text="Only the tenant admin can manage branches." />;
+    return (
+      <EmptyState
+        icon={<Lock className="h-10 w-10" />}
+        text="Only the tenant admin can manage branches."
+      />
+    );
   if (loading) return <Spinner label="Loading branches…" />;
 
   return (
@@ -104,7 +110,7 @@ export default function BranchesPage() {
       <ErrorNote message={error} />
 
       {branches.length === 0 ? (
-        <EmptyState icon="🏪" text="No branches yet." />
+        <EmptyState icon={<Store className="h-10 w-10" />} text="No branches yet." />
       ) : (
         <div className="flex flex-col gap-3">
           {branches.map((b) => (

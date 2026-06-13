@@ -1,11 +1,18 @@
 import Link from "next/link";
+import { UtensilsCrossed, Smartphone, Palette, Zap } from "lucide-react";
+
+const FEATURES = [
+  [Smartphone, "No app needed", "Customers scan the table QR and order from the browser."],
+  [Palette, "Your brand", "Every tenant sets their own colors and logo — the whole storefront adapts."],
+  [Zap, "Live orders", "Staff dashboards update in real time as orders come in."],
+] as const;
 
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
       <header className="px-6 py-4 flex items-center justify-between border-b border-gray-200 bg-white">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🍽️</span>
+          <UtensilsCrossed className="h-6 w-6 text-brand" />
           <span className="font-bold text-lg">QR Ordering</span>
         </div>
         <nav className="flex items-center gap-4 text-sm">
@@ -43,13 +50,9 @@ export default function Home() {
         </div>
 
         <div className="mt-16 grid gap-6 sm:grid-cols-3 max-w-4xl text-left">
-          {[
-            ["📱", "No app needed", "Customers scan the table QR and order from the browser."],
-            ["🎨", "Your brand", "Every tenant sets their own colors and logo — the whole storefront adapts."],
-            ["⚡", "Live orders", "Staff dashboards update in real time as orders come in."],
-          ].map(([icon, title, desc]) => (
+          {FEATURES.map(([Icon, title, desc]) => (
             <div key={title} className="card p-5">
-              <div className="text-2xl">{icon}</div>
+              <Icon className="h-6 w-6 text-brand" />
               <h3 className="mt-2 font-semibold">{title}</h3>
               <p className="mt-1 text-sm text-gray-600">{desc}</p>
             </div>

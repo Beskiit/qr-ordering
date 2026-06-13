@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
+import { Search, UtensilsCrossed, Camera, Eye, EyeOff, RotateCcw } from "lucide-react";
 import { Category, Product, formatMoney } from "@/lib/types";
 import { randomId } from "@/lib/uid";
 
@@ -63,6 +64,12 @@ export default function MenuManagementPage() {
 
   async function toggleCategory(c: Category) {
     await supabase.from("categories").update({ is_active: !c.is_active }).eq("id", c.id);
+    load();
+  }
+
+  // Optional accent color per category (null = default card styling).
+  async function setCategoryColor(c: Category, color: string | null) {
+    await supabase.from("categories").update({ color }).eq("id", c.id);
     load();
   }
 
@@ -236,9 +243,29 @@ export default function MenuManagementPage() {
                   : "border-dashed border-gray-300 text-gray-400"
               }`}
             >
+              <input
+                type="color"
+                value={c.color ?? "#d1d5db"}
+                onChange={(e) => setCategoryColor(c, e.target.value)}
+                title="Card color for this category"
+                className="h-4 w-4 rounded cursor-pointer border border-gray-300 p-0 bg-transparent"
+              />
               {c.name}
+              {c.color && (
+                <button
+                  onClick={() => setCategoryColor(c, null)}
+                  title="Reset to default color"
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button onClick={() => toggleCategory(c)} title="Toggle visibility">
-                {c.is_active ? "👁️" : "🚫"}
+                {c.is_active ? (
+                  <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4 text-gray-400" />
+                )}
               </button>
               <button onClick={() => deleteCategory(c)} className="text-red-400" title="Delete">
                 ✕
@@ -267,7 +294,7 @@ export default function MenuManagementPage() {
         <div className="flex gap-2 mb-4">
           <input
             className="input flex-1"
-            placeholder="🔍 Search products…"
+            placeholder="Search products…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -286,9 +313,15 @@ export default function MenuManagementPage() {
         </div>
 
         {products.length === 0 ? (
-          <EmptyState icon="🍔" text="No products yet." />
+          <EmptyState
+            icon={<UtensilsCrossed className="h-10 w-10" />}
+            text="No products yet."
+          />
         ) : visibleProducts.length === 0 ? (
-          <EmptyState icon="🔍" text="No products match your search." />
+          <EmptyState
+            icon={<Search className="h-10 w-10" />}
+            text="No products match your search."
+          />
         ) : (
           <div className="flex flex-col divide-y divide-gray-100">
             {visibleProducts.map((p) => (
@@ -296,14 +329,31 @@ export default function MenuManagementPage() {
                 {p.image_url ? (
                   <img src={p.image_url} alt={p.name} className="h-12 w-12 rounded-lg object-cover" />
                 ) : (
-                  <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center">🍴</div>
+                  <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <UtensilsCrossed className="h-5 w-5 text-gray-300" />
+                  </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <p className={`font-semibold truncate ${!p.is_available ? "text-gray-400 line-through" : ""}`}>
                     {p.name}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {categories.find((c) => c.id === p.category_id)?.name} · {formatMoney(p.price)}
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                    {(() => {
+                      const cat = categories.find((c) => c.id === p.category_id);
+                      return (
+                        <>
+                          {cat?.color && (
+                            <span
+                              className="inline-block h-2 w-2 rounded-full shrink-0"
+                              style={{ background: cat.color }}
+                            />
+                          )}
+                          <span>
+                            {cat?.name} · {formatMoney(p.price)}
+                          </span>
+                        </>
+                      );
+                    })()}
                   </p>
                 </div>
                 <button
@@ -395,10 +445,13 @@ export default function MenuManagementPage() {
                   className="h-16 w-16 rounded-lg object-cover"
                 />
               ) : (
-                <div className="h-16 w-16 rounded-lg bg-gray-100 flex items-center justify-center">🍴</div>
+                <div className="h-16 w-16 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <UtensilsCrossed className="h-6 w-6 text-gray-300" />
+                </div>
               )}
-              <label className="flex-1 cursor-pointer rounded-lg border border-dashed border-gray-300 px-3 py-3 text-center text-sm text-gray-500 hover:border-[var(--brand)]">
-                {uploading ? "Uploading…" : "📷 Upload photo"}
+              <label className="flex-1 cursor-pointer rounded-lg border border-dashed border-gray-300 px-3 py-3 text-center text-sm text-gray-500 hover:border-brand flex items-center justify-center gap-2">
+                <Camera className="h-4 w-4" />
+                {uploading ? "Uploading…" : "Upload photo"}
                 <input
                   type="file"
                   accept="image/*"

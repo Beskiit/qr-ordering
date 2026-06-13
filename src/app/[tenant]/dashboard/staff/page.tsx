@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote, Avatar } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
+import { Lock, Users } from "lucide-react";
 import { Staff } from "@/lib/types";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -90,7 +91,12 @@ export default function StaffPage() {
   }
 
   if (!isAllowed)
-    return <EmptyState icon="🔒" text="Only the tenant admin can manage staff." />;
+    return (
+      <EmptyState
+        icon={<Lock className="h-10 w-10" />}
+        text="Only the tenant admin can manage staff."
+      />
+    );
   if (loading) return <Spinner label="Loading staff…" />;
 
   return (
@@ -105,7 +111,7 @@ export default function StaffPage() {
       <ErrorNote message={error} />
 
       {staffList.length === 0 ? (
-        <EmptyState icon="👥" text="No staff yet." />
+        <EmptyState icon={<Users className="h-10 w-10" />} text="No staff yet." />
       ) : (
         <div className="flex flex-col gap-3">
           {staffList.map((s) => (

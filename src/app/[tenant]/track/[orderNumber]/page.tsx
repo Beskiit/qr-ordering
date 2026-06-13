@@ -7,6 +7,17 @@ import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { Spinner, Avatar } from "@/components/ui";
 import {
+  Clock,
+  CheckCircle2,
+  ChefHat,
+  BellRing,
+  PartyPopper,
+  XCircle,
+  Search,
+  Receipt,
+  Download,
+} from "lucide-react";
+import {
   formatMoney,
   orderDestination,
   ORDER_STATUS_FLOW,
@@ -40,13 +51,15 @@ interface TrackedOrder {
   items: TrackedItem[];
 }
 
-const STATUS_LABELS: Record<string, [string, string]> = {
-  pending: ["🕐", "Order received"],
-  confirmed: ["✅", "Confirmed by staff"],
-  preparing: ["👨‍🍳", "Being prepared"],
-  ready: ["🔔", "Ready — coming to your table!"],
-  completed: ["🎉", "Served. Enjoy!"],
-  cancelled: ["❌", "Order cancelled"],
+type IconType = React.ComponentType<{ className?: string }>;
+
+const STATUS_LABELS: Record<string, [IconType, string]> = {
+  pending: [Clock, "Order received"],
+  confirmed: [CheckCircle2, "Confirmed by staff"],
+  preparing: [ChefHat, "Being prepared"],
+  ready: [BellRing, "Ready — coming to your table!"],
+  completed: [PartyPopper, "Served. Enjoy!"],
+  cancelled: [XCircle, "Order cancelled"],
 };
 
 export default function TrackOrderPage() {
@@ -203,7 +216,7 @@ export default function TrackOrderPage() {
     async (orderNo: string) => {
       if (!("Notification" in window) || Notification.permission !== "granted")
         return;
-      const title = `🔔 ${tenant.name} — order ready!`;
+      const title = `${tenant.name} — order ready!`;
       const options: NotificationOptions & { vibrate?: number[] } = {
         body: `Order ${orderNo} is ready and coming to your table.`,
         tag: "order-ready",
@@ -254,7 +267,7 @@ export default function TrackOrderPage() {
   if (!order) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-        <div className="text-5xl">🔍</div>
+        <Search className="h-12 w-12 mx-auto text-gray-300" />
         <h1 className="mt-3 font-bold text-xl">Order not found</h1>
         <p className="mt-1 text-gray-500 text-sm">
           We couldn&apos;t find an order with that number.
@@ -290,8 +303,11 @@ export default function TrackOrderPage() {
 
       {/* Live status */}
       <div className="card p-5 text-center">
-        <div className="text-5xl">
-          {STATUS_LABELS[order.order_status]?.[0] ?? "🕐"}
+        <div className="flex justify-center">
+          {(() => {
+            const Icon = STATUS_LABELS[order.order_status]?.[0] ?? Clock;
+            return <Icon className="h-12 w-12 text-[var(--brand)]" />;
+          })()}
         </div>
         <h2 className="mt-2 font-bold text-xl">
           {STATUS_LABELS[order.order_status]?.[1] ?? order.order_status}
@@ -303,14 +319,17 @@ export default function TrackOrderPage() {
 
       {/* Buzzer opt-in / status */}
       {waitingForFood && !buzzerOn && (
-        <button onClick={enableBuzzer} className="btn-brand w-full py-3">
-          🔔 Buzz this phone when it&apos;s ready
+        <button
+          onClick={enableBuzzer}
+          className="btn-brand w-full py-3 flex items-center justify-center gap-2"
+        >
+          <BellRing className="h-4 w-4" /> Buzz this phone when it&apos;s ready
         </button>
       )}
       {waitingForFood && buzzerOn && (
-        <p className="text-center text-sm text-gray-500">
-          🔔 Buzzer on — keep this page open and we&apos;ll ring when your
-          order is ready.
+        <p className="text-center text-sm text-gray-500 flex items-center justify-center gap-1.5">
+          <BellRing className="h-4 w-4" /> Buzzer on — keep this page open and
+          we&apos;ll ring when your order is ready.
         </p>
       )}
 
@@ -320,7 +339,7 @@ export default function TrackOrderPage() {
           onClick={stopBuzzing}
           className="fixed inset-0 z-50 bg-brand text-white flex flex-col items-center justify-center gap-3"
         >
-          <span className="text-7xl animate-bounce">🔔</span>
+          <BellRing className="h-20 w-20 animate-bounce" />
           <span className="font-bold text-2xl">Your order is ready!</span>
           <span className="text-sm opacity-80">Tap anywhere to stop</span>
         </button>
@@ -422,7 +441,9 @@ export default function TrackOrderPage() {
                           : "border-gray-200"
                       }`}
                     >
-                      <span className="font-medium">🧾 Pay at counter</span>
+                      <span className="font-medium flex items-center gap-2">
+                        <Receipt className="h-4 w-4" /> Pay at counter
+                      </span>
                       {active === "counter" && (
                         <span className="text-brand font-semibold">✓</span>
                       )}
@@ -533,9 +554,9 @@ export default function TrackOrderPage() {
                     PAYMENT_METHOD_LABELS[payModal.type]
                   )
                 }
-                className="btn-brand w-full py-2.5"
+                className="btn-brand w-full py-2.5 flex items-center justify-center gap-2"
               >
-                ⬇️ Save QR
+                <Download className="h-4 w-4" /> Save QR
               </button>
             )}
             <button

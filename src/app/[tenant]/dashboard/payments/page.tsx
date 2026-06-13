@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
 import { useToast } from "@/components/feedback";
+import { Lock, QrCode, Camera } from "lucide-react";
 import {
   PaymentMethod,
   PaymentMethodType,
@@ -118,7 +119,12 @@ export default function PaymentOptionsPage() {
   }
 
   if (!isAllowed)
-    return <EmptyState icon="🔒" text="Only the tenant admin can manage payment options." />;
+    return (
+      <EmptyState
+        icon={<Lock className="h-10 w-10" />}
+        text="Only the tenant admin can manage payment options."
+      />
+    );
   if (loading) return <Spinner label="Loading payment options…" />;
 
   return (
@@ -179,16 +185,17 @@ export default function PaymentOptionsPage() {
                       className="h-24 w-24 rounded-lg object-cover border border-gray-200"
                     />
                   ) : (
-                    <div className="h-24 w-24 rounded-lg bg-gray-100 flex items-center justify-center text-2xl">
-                      📱
+                    <div className="h-24 w-24 rounded-lg bg-gray-100 flex items-center justify-center">
+                      <QrCode className="h-8 w-8 text-gray-300" />
                     </div>
                   )}
-                  <label className="flex-1 cursor-pointer rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-sm text-gray-500 hover:border-brand">
+                  <label className="flex-1 cursor-pointer rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-sm text-gray-500 hover:border-brand flex items-center justify-center gap-2">
+                    <Camera className="h-4 w-4" />
                     {uploading === type
                       ? "Uploading…"
                       : m.qr_url
-                      ? "📷 Replace QR code"
-                      : "📷 Upload QR code"}
+                      ? "Replace QR code"
+                      : "Upload QR code"}
                     <input
                       type="file"
                       accept="image/*"

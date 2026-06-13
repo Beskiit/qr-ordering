@@ -30,11 +30,19 @@ export function ErrorNote({ message }: { message: string | null }) {
   );
 }
 
-export function EmptyState({ icon, text }: { icon: string; text: string }) {
+export function EmptyState({
+  icon,
+  text,
+}: {
+  icon?: React.ReactNode;
+  text: string;
+}) {
   return (
     <div className="py-14 text-center text-gray-400">
-      <div className="text-4xl">{icon}</div>
-      <p className="mt-2 text-sm">{text}</p>
+      {icon && (
+        <div className="flex justify-center mb-3 text-gray-300">{icon}</div>
+      )}
+      <p className="text-sm">{text}</p>
     </div>
   );
 }

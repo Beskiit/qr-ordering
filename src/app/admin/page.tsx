@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner, EmptyState, ErrorNote, Avatar } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
+import { ShieldCheck, Building2 } from "lucide-react";
 import { Tenant } from "@/lib/types";
 
 export default function SuperAdminPage() {
@@ -140,7 +141,7 @@ export default function SuperAdminPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-gray-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🛡️</span>
+          <ShieldCheck className="h-5 w-5" />
           <h1 className="font-bold">Super Admin — Tenants</h1>
         </div>
         <button
@@ -164,7 +165,10 @@ export default function SuperAdminPage() {
         <ErrorNote message={error} />
 
         {tenants.length === 0 ? (
-          <EmptyState icon="🏢" text="No tenants yet. Onboard your first restaurant!" />
+          <EmptyState
+            icon={<Building2 className="h-10 w-10" />}
+            text="No tenants yet. Onboard your first restaurant!"
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {tenants.map((t) => (

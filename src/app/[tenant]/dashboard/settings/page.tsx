@@ -7,6 +7,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Avatar, ErrorNote } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
+import { Palette, User, Camera, ShoppingCart } from "lucide-react";
 import { randomId } from "@/lib/uid";
 
 const PRESET_COLORS = [
@@ -132,7 +133,9 @@ export default function SettingsPage() {
             } as React.CSSProperties
           }
         >
-          <h2 className="font-bold text-lg">🎨 Brand identity</h2>
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <Palette className="h-5 w-5" /> Brand identity
+          </h2>
           <p className="text-sm text-gray-500 mb-5">
             Your customers see these colors and logo on the menu, order
             tracking, and your whole storefront.
@@ -142,8 +145,9 @@ export default function SettingsPage() {
           <div className="flex items-center gap-4 mb-6">
             <Avatar url={logoUrl} name={tenant.name} size={72} />
             <div>
-              <label className="btn-brand inline-block cursor-pointer text-sm">
-                {uploadingLogo ? "Uploading…" : "📷 Upload logo"}
+              <label className="btn-brand inline-flex items-center gap-1.5 cursor-pointer text-sm">
+                <Camera className="h-4 w-4" />
+                {uploadingLogo ? "Uploading…" : "Upload logo"}
                 <input
                   type="file"
                   accept="image/*"
@@ -229,7 +233,9 @@ export default function SettingsPage() {
               className="mt-3 w-full rounded-[0.625rem] py-2.5 font-semibold text-white"
               style={{ backgroundColor: brandColor }}
             >
-              🛒 2 items · Place order
+              <span className="inline-flex items-center justify-center gap-2">
+                <ShoppingCart className="h-4 w-4" /> 2 items · Place order
+              </span>
             </button>
           </div>
 
@@ -250,7 +256,9 @@ export default function SettingsPage() {
 
       {/* ── My profile (everyone) ────────────────────────────── */}
       <section className="card p-6">
-        <h2 className="font-bold text-lg">👤 My profile</h2>
+        <h2 className="font-bold text-lg flex items-center gap-2">
+          <User className="h-5 w-5" /> My profile
+        </h2>
         <p className="text-sm text-gray-500 mb-5">
           Your display name and profile picture.
         </p>
@@ -258,8 +266,9 @@ export default function SettingsPage() {
         <div className="flex items-center gap-4 mb-4">
           <Avatar url={avatarUrl} name={name} size={72} />
           <div>
-            <label className="btn-brand inline-block cursor-pointer text-sm">
-              {uploadingAvatar ? "Uploading…" : "📷 Upload photo"}
+            <label className="btn-brand inline-flex items-center gap-1.5 cursor-pointer text-sm">
+              <Camera className="h-4 w-4" />
+              {uploadingAvatar ? "Uploading…" : "Upload photo"}
               <input
                 type="file"
                 accept="image/*"

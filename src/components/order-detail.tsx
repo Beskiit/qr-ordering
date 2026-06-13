@@ -1,6 +1,7 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui";
+import { StickyNote } from "lucide-react";
 import {
   formatMoney,
   orderDestination,
@@ -72,7 +73,10 @@ export function OrderDetailView({ order }: { order: OrderDetailData }) {
                 </p>
               )}
               {item.notes && (
-                <p className="text-xs text-amber-600">📝 {item.notes}</p>
+                <p className="flex items-center gap-1 text-xs text-amber-600">
+                  <StickyNote className="h-3 w-3 shrink-0" />
+                  {item.notes}
+                </p>
               )}
               <p className="text-xs text-gray-400">
                 {formatMoney(item.unit_price)} each

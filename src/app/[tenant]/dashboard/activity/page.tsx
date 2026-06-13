@@ -8,11 +8,54 @@ import { Spinner, EmptyState } from "@/components/ui";
 import { Drawer } from "@/components/drawer";
 import { MethodBadge } from "@/components/method-badge";
 import {
+  ReceiptText,
+  RefreshCw,
+  Pencil,
+  Banknote,
+  Undo2,
+  Calculator,
+  PlusCircle,
+  MinusCircle,
+  LogIn,
+  LogOut,
+  Circle,
+  Lock,
+  History,
+} from "lucide-react";
+import {
   formatMoney,
   ActivityLog,
   PaymentChoice,
   PAYMENT_CHOICE_LABELS,
 } from "@/lib/types";
+
+function iconFor(action: string) {
+  const cls = "h-5 w-5 text-gray-400 shrink-0";
+  switch (action) {
+    case "order_placed":
+      return <ReceiptText className={cls} />;
+    case "order_status_changed":
+      return <RefreshCw className={cls} />;
+    case "order_edited":
+      return <Pencil className={cls} />;
+    case "payment_settled":
+      return <Banknote className={cls} />;
+    case "payment_undone":
+      return <Undo2 className={cls} />;
+    case "drawer_closed":
+      return <Calculator className={cls} />;
+    case "cash_in":
+      return <PlusCircle className={cls} />;
+    case "cash_out":
+      return <MinusCircle className={cls} />;
+    case "staff_signed_in":
+      return <LogIn className={cls} />;
+    case "staff_signed_out":
+      return <LogOut className={cls} />;
+    default:
+      return <Circle className={cls} />;
+  }
+}
 
 // The payment method recorded on a settled-payment log, if any.
 function payMethodOf(log: ActivityLog): PaymentChoice | null {
@@ -93,46 +136,34 @@ const FILTER_ACTIONS: Record<Exclude<FilterKey, "all">, string[]> = {
   sessions: ["staff_signed_in", "staff_signed_out"],
 };
 
-function describe(log: ActivityLog): { icon: string; text: string } {
+function describe(log: ActivityLog): string {
   const d = log.details ?? {};
   const num = typeof d.order_number === "string" ? d.order_number : "?";
   switch (log.action) {
     case "order_placed":
-      return {
-        icon: "🧾",
-        text: `Order ${num} placed · ${formatMoney(Number(d.total) || 0)}`,
-      };
+      return `Order ${num} placed · ${formatMoney(Number(d.total) || 0)}`;
     case "order_status_changed":
-      return { icon: "🔄", text: `Order ${num}: ${d.from} → ${d.to}` };
+      return `Order ${num}: ${d.from} → ${d.to}`;
     case "order_edited":
-      return {
-        icon: "✏️",
-        text: `Order ${num} edited · ${formatMoney(Number(d.total) || 0)}`,
-      };
+      return `Order ${num} edited · ${formatMoney(Number(d.total) || 0)}`;
     case "payment_settled": {
       const method = typeof d.method === "string" ? d.method : "counter";
       if (method !== "counter") {
-        return {
-          icon: "💳",
-          text: `Order ${num} paid · ${
-            PAYMENT_CHOICE_LABELS[method as PaymentChoice] ?? method
-          } ${formatMoney(Number(d.total) || 0)}`,
-        };
+        return `Order ${num} paid · ${
+          PAYMENT_CHOICE_LABELS[method as PaymentChoice] ?? method
+        } ${formatMoney(Number(d.total) || 0)}`;
       }
-      return {
-        icon: "💵",
-        text: `Order ${num} paid · cash ${formatMoney(
-          Number(d.amount_paid) || 0
-        )} · change ${formatMoney(Number(d.change_due) || 0)}`,
-      };
+      return `Order ${num} paid · cash ${formatMoney(
+        Number(d.amount_paid) || 0
+      )} · change ${formatMoney(Number(d.change_due) || 0)}`;
     }
     case "payment_undone":
-      return { icon: "↩️", text: `Order ${num} payment undone` };
+      return `Order ${num} payment undone`;
     case "drawer_closed": {
       const v = Number(d.variance) || 0;
       const verdict =
         Math.abs(v) < 0.005
-          ? "balanced ✓"
+          ? "balanced"
           : v < 0
           ? `short ${formatMoney(-v)}`
           : `over ${formatMoney(v)}`;
@@ -140,35 +171,24 @@ function describe(log: ActivityLog): { icon: string; text: string } {
         d.left_in_drawer == null
           ? ""
           : ` · left ${formatMoney(Number(d.left_in_drawer) || 0)}`;
-      return {
-        icon: "💰",
-        text: `Drawer closed · float ${formatMoney(
-          Number(d.starting_float) || 0
-        )} · counted ${formatMoney(
-          Number(d.counted_cash) || 0
-        )}${left} — ${verdict}`,
-      };
+      return `Drawer closed · float ${formatMoney(
+        Number(d.starting_float) || 0
+      )} · counted ${formatMoney(Number(d.counted_cash) || 0)}${left} — ${verdict}`;
     }
     case "cash_in":
-      return {
-        icon: "📥",
-        text: `Cash in ${formatMoney(Number(d.amount) || 0)}${
-          d.reason ? ` · ${d.reason}` : ""
-        }`,
-      };
+      return `Cash in ${formatMoney(Number(d.amount) || 0)}${
+        d.reason ? ` · ${d.reason}` : ""
+      }`;
     case "cash_out":
-      return {
-        icon: "📤",
-        text: `Cash out ${formatMoney(Number(d.amount) || 0)}${
-          d.reason ? ` · ${d.reason}` : ""
-        }`,
-      };
+      return `Cash out ${formatMoney(Number(d.amount) || 0)}${
+        d.reason ? ` · ${d.reason}` : ""
+      }`;
     case "staff_signed_in":
-      return { icon: "🔓", text: "Signed in" };
+      return "Signed in";
     case "staff_signed_out":
-      return { icon: "🔒", text: "Signed out" };
+      return "Signed out";
     default:
-      return { icon: "•", text: log.action };
+      return log.action;
   }
 }
 
@@ -236,7 +256,12 @@ export default function ActivityPage() {
   }
 
   if (!isAllowed)
-    return <EmptyState icon="🔒" text="Only admins can view the activity log." />;
+    return (
+      <EmptyState
+        icon={<Lock className="h-10 w-10" />}
+        text="Only admins can view the activity log."
+      />
+    );
 
   return (
     <div className="flex flex-col gap-4 max-w-3xl w-full mx-auto">
@@ -291,14 +316,14 @@ export default function ActivityPage() {
         <Spinner label="Loading activity…" />
       ) : logs.length === 0 ? (
         <EmptyState
-          icon="📜"
+          icon={<History className="h-10 w-10" />}
           text="Nothing here yet. Orders, payments and staff sessions will appear as they happen."
         />
       ) : (
         <div className="card p-5">
           <div className="flex flex-col divide-y divide-gray-100">
             {logs.map((log) => {
-              const { icon, text } = describe(log);
+              const text = describe(log);
               const payMethod = payMethodOf(log);
               return (
                 <button
@@ -309,7 +334,7 @@ export default function ActivityPage() {
                   {payMethod ? (
                     <MethodBadge type={payMethod} />
                   ) : (
-                    <span className="text-lg shrink-0">{icon}</span>
+                    iconFor(log.action)
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{text}</p>
@@ -353,7 +378,7 @@ export default function ActivityPage() {
               {payMethodOf(selected) ? (
                 <MethodBadge type={payMethodOf(selected)!} size={32} />
               ) : (
-                <span className="text-2xl">{describe(selected).icon}</span>
+                iconFor(selected.action)
               )}
               <div>
                 <p className="font-bold">

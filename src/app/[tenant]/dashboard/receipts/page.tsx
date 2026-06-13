@@ -6,6 +6,7 @@ import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState } from "@/components/ui";
 import { Drawer } from "@/components/drawer";
 import { OrderDetailView } from "@/components/order-detail";
+import { ReceiptText } from "lucide-react";
 import { formatMoney, orderDestination, Order, OrderItem } from "@/lib/types";
 
 type OrderRow = Order & {
@@ -62,7 +63,7 @@ export default function ReceiptsPage() {
         </h2>
         <input
           className="input !w-auto"
-          placeholder="🔍 Order # or customer…"
+          placeholder="Search order # or customer…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -70,7 +71,7 @@ export default function ReceiptsPage() {
 
       {visible.length === 0 ? (
         <EmptyState
-          icon="📄"
+          icon={<ReceiptText className="h-10 w-10" />}
           text={
             query
               ? "No receipts match your search."

@@ -9,19 +9,32 @@ import { DashboardProvider, useDashboard } from "@/lib/dashboard-context";
 import { Avatar } from "@/components/ui";
 import { useConfirm } from "@/components/feedback";
 import type { Branch, Staff } from "@/lib/types";
+import {
+  ClipboardList,
+  ReceiptText,
+  BarChart3,
+  Banknote,
+  History,
+  UtensilsCrossed,
+  QrCode,
+  Store,
+  Users,
+  CreditCard,
+  Settings,
+} from "lucide-react";
 
 const NAV = [
-  { href: "", label: "Orders", icon: "🧾", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
-  { href: "/receipts", label: "Receipts", icon: "📄", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
-  { href: "/sales", label: "Sales", icon: "📊", roles: ["super_admin", "tenant_admin", "branch_admin"] },
-  { href: "/drawer", label: "Cash drawer", icon: "💵", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
-  { href: "/activity", label: "Activity", icon: "📜", roles: ["super_admin", "tenant_admin", "branch_admin"] },
-  { href: "/menu", label: "Menu", icon: "🍔", roles: ["super_admin", "tenant_admin", "branch_admin"] },
-  { href: "/tables", label: "Tables & QR", icon: "🪑", roles: ["super_admin", "tenant_admin", "branch_admin"] },
-  { href: "/branches", label: "Branches", icon: "🏪", roles: ["super_admin", "tenant_admin"] },
-  { href: "/staff", label: "Staff", icon: "👥", roles: ["super_admin", "tenant_admin"] },
-  { href: "/payments", label: "Payment options", icon: "💳", roles: ["super_admin", "tenant_admin"] },
-  { href: "/settings", label: "Settings", icon: "⚙️", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
+  { href: "", label: "Orders", icon: ClipboardList, roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
+  { href: "/receipts", label: "Receipts", icon: ReceiptText, roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
+  { href: "/menu", label: "Menu", icon: UtensilsCrossed, roles: ["super_admin", "tenant_admin", "branch_admin"] },
+  { href: "/sales", label: "Sales", icon: BarChart3, roles: ["super_admin", "tenant_admin", "branch_admin"] },
+  { href: "/drawer", label: "Cash drawer", icon: Banknote, roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
+  { href: "/tables", label: "Tables & QR", icon: QrCode, roles: ["super_admin", "tenant_admin", "branch_admin"] },
+  { href: "/activity", label: "Activity", icon: History, roles: ["super_admin", "tenant_admin", "branch_admin"] },
+  { href: "/branches", label: "Branches", icon: Store, roles: ["super_admin", "tenant_admin"] },
+  { href: "/staff", label: "Staff", icon: Users, roles: ["super_admin", "tenant_admin"] },
+  { href: "/payments", label: "Payment options", icon: CreditCard, roles: ["super_admin", "tenant_admin"] },
+  { href: "/settings", label: "Settings", icon: Settings, roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
 ];
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -85,7 +98,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                     : "text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                <span>{n.icon}</span> {n.label}
+                <n.icon className="h-4 w-4 shrink-0" /> {n.label}
               </Link>
             );
           })}

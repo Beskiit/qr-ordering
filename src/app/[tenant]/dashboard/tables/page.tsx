@@ -7,6 +7,7 @@ import { useDashboard } from "@/lib/dashboard-context";
 import { useTenant } from "@/lib/tenant-context";
 import { Spinner, EmptyState, ErrorNote } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
+import { QrCode, Download } from "lucide-react";
 import { DiningTable } from "@/lib/types";
 
 export default function TablesPage() {
@@ -127,7 +128,10 @@ export default function TablesPage() {
       </form>
 
       {tables.length === 0 ? (
-        <EmptyState icon="🪑" text="No tables yet. Add one — its QR code generates instantly." />
+        <EmptyState
+          icon={<QrCode className="h-10 w-10" />}
+          text="No tables yet. Add one — its QR code generates instantly."
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tables.map((t) => (
@@ -145,8 +149,11 @@ export default function TablesPage() {
                 {menuUrl(t.qr_token)}
               </p>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => downloadQR(t)} className="btn-brand text-xs px-3 py-1.5">
-                  ⬇ Download PNG
+                <button
+                  onClick={() => downloadQR(t)}
+                  className="btn-brand text-xs px-3 py-1.5 inline-flex items-center gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download PNG
                 </button>
                 <button
                   onClick={() => deleteTable(t)}

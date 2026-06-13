@@ -46,6 +46,7 @@ export interface Category {
   branch_id: string;
   name: string;
   description: string | null;
+  color: string | null; // optional accent color; null = default card styling
   display_order: number;
   is_active: boolean;
 }

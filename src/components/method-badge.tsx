@@ -8,7 +8,7 @@ export const METHOD_META: Record<
   counter: { label: "Cash", mono: "₱", color: "#16a34a" },
   gcash: { label: "GCash", mono: "G", color: "#007DFE" },
   maya: { label: "Maya", mono: "M", color: "#0AB287" },
-  bank: { label: "Bank", mono: "🏦", color: "#475569" },
+  bank: { label: "Bank", mono: "B", color: "#475569" },
 };
 
 export function MethodBadge({

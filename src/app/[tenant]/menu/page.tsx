@@ -21,6 +21,7 @@ import {
   ProductOptionsDialog,
   OptionSelection,
 } from "@/components/product-options-dialog";
+import { Search, Eye, UtensilsCrossed, ShoppingCart } from "lucide-react";
 
 export default function MenuPage() {
   const tenant = useTenant();
@@ -260,9 +261,7 @@ export default function MenuPage() {
         {/* Search */}
         <div className="px-4 pb-2">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-              🔍
-            </span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               className="w-full rounded-full bg-gray-100 pl-9 pr-9 py-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-gray-200"
               placeholder="Search the menu…"
@@ -308,15 +307,21 @@ export default function MenuPage() {
         <ErrorNote message={error} />
 
         {!table && !error && (
-          <p className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2">
-            👀 You&apos;re browsing the menu. Scan the QR code on your table to
-            place an order.
+          <p className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 flex items-center gap-2">
+            <Eye className="h-4 w-4 shrink-0" /> You&apos;re browsing the menu.
+            Scan the QR code on your table to place an order.
           </p>
         )}
 
         {visibleProducts.length === 0 && !error ? (
           <EmptyState
-            icon={query ? "🔍" : "🍽️"}
+            icon={
+              query ? (
+                <Search className="h-10 w-10" />
+              ) : (
+                <UtensilsCrossed className="h-10 w-10" />
+              )
+            }
             text={
               query
                 ? `No results for “${search.trim()}”`
@@ -348,8 +353,8 @@ export default function MenuPage() {
                       }`}
                     />
                   ) : (
-                    <div className="h-20 w-20 rounded-xl bg-gray-100 flex items-center justify-center text-2xl shrink-0">
-                      🍴
+                    <div className="h-20 w-20 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                      <UtensilsCrossed className="h-7 w-7 text-gray-300" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
@@ -431,8 +436,9 @@ export default function MenuPage() {
             onClick={() => setCartOpen(true)}
             className="btn-brand w-full flex items-center justify-between px-5 py-3.5 shadow-lg"
           >
-            <span>
-              🛒 {cartCount} item{cartCount > 1 ? "s" : ""}
+            <span className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" /> {cartCount} item
+              {cartCount > 1 ? "s" : ""}
             </span>
             <span>{formatMoney(cartTotal)} · View order</span>
           </button>

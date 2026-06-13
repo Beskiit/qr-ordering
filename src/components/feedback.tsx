@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Check, AlertTriangle } from "lucide-react";
 
 type Tone = "danger" | "default";
 
@@ -134,11 +135,15 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((t) => (
             <div
               key={t.id}
-              className={`pointer-events-auto rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-lg ${
+              className={`pointer-events-auto rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-lg flex items-center gap-2 ${
                 t.tone === "error" ? "bg-red-600" : "bg-gray-900"
               }`}
             >
-              {t.tone === "error" ? "⚠️ " : "✓ "}
+              {t.tone === "error" ? (
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+              ) : (
+                <Check className="h-4 w-4 shrink-0" />
+              )}
               {t.message}
             </div>
           ))}
