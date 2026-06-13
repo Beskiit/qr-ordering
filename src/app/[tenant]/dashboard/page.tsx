@@ -10,7 +10,13 @@ import { PaymentDialog } from "@/components/payment-dialog";
 import { Drawer } from "@/components/drawer";
 import { OrderDetailView } from "@/components/order-detail";
 import { useConfirm } from "@/components/feedback";
-import { formatMoney, Order, OrderItem, OrderStatus } from "@/lib/types";
+import {
+  formatMoney,
+  orderDestination,
+  Order,
+  OrderItem,
+  OrderStatus,
+} from "@/lib/types";
 
 type OrderRow = Order & {
   order_items: OrderItem[];
@@ -143,9 +149,7 @@ export default function OrdersBoard() {
                   <div>
                     <p className="font-bold">{o.order_number}</p>
                     <p className="text-xs text-gray-500">
-                      {o.tables?.table_number
-                        ? `Table ${o.tables.table_number}`
-                        : "Walk-in"}
+                      {orderDestination(o.order_type, o.tables?.table_number ?? null)}
                       {o.customer_name ? ` · ${o.customer_name}` : ""} ·{" "}
                       {new Date(o.created_at).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -243,11 +247,10 @@ export default function OrdersBoard() {
         <PaymentDialog
           orderId={settling.id}
           orderNumber={settling.order_number}
-          tableLabel={
-            settling.tables?.table_number
-              ? `Table ${settling.tables.table_number}`
-              : "Walk-in"
-          }
+          tableLabel={orderDestination(
+            settling.order_type,
+            settling.tables?.table_number ?? null
+          )}
           total={settling.total}
           onClose={() => setSettling(null)}
           onPaid={() => {

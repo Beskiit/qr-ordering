@@ -1,17 +1,27 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui";
-import { formatMoney, OrderItem, OrderStatus } from "@/lib/types";
+import {
+  formatMoney,
+  orderDestination,
+  OrderItem,
+  OrderStatus,
+  OrderType,
+  PaymentChoice,
+  PAYMENT_CHOICE_LABELS,
+} from "@/lib/types";
 
 export interface OrderDetailData {
   order_number: string;
   order_status: OrderStatus;
+  order_type: OrderType;
   created_at: string;
   customer_name: string | null;
   tableNumber: string | null;
   subtotal: number;
   total: number;
   payment_status: "unpaid" | "paid";
+  payment_method: PaymentChoice;
   amount_paid: number | null;
   change_due: number | null;
   paid_at: string | null;
@@ -35,7 +45,7 @@ export function OrderDetailView({ order }: { order: OrderDetailData }) {
         <div>
           <p className="font-bold text-lg">{order.order_number}</p>
           <p className="text-sm text-gray-500">
-            {order.tableNumber ? `Table ${order.tableNumber}` : "Walk-in"}
+            {orderDestination(order.order_type, order.tableNumber)}
             {order.customer_name ? ` · ${order.customer_name}` : ""}
           </p>
         </div>
@@ -99,6 +109,12 @@ export function OrderDetailView({ order }: { order: OrderDetailData }) {
             }`}
           >
             {order.payment_status}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Method</span>
+          <span className="font-medium">
+            {PAYMENT_CHOICE_LABELS[order.payment_method]}
           </span>
         </div>
         {order.payment_status === "paid" && order.amount_paid != null && (

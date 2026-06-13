@@ -89,23 +89,42 @@ export interface DiningTable {
   is_active: boolean;
 }
 
+export type OrderType = "dine_in" | "walk_in" | "pickup" | "delivery";
+
 export interface Order {
   id: string;
   branch_id: string;
   table_id: string | null;
   order_number: string;
   order_status: OrderStatus;
+  order_type: OrderType;
   customer_name: string | null;
   subtotal: number;
   tax: number;
   total: number;
   payment_status: "unpaid" | "paid";
+  payment_method: PaymentChoice;
   amount_paid: number | null;
   change_due: number | null;
   paid_at: string | null;
   completed_at: string | null;
   created_at: string;
 }
+
+export type PaymentChoice = "counter" | "gcash" | "maya" | "bank";
+
+export const PAYMENT_CHOICE_LABELS: Record<PaymentChoice, string> = {
+  counter: "Pay at counter",
+  gcash: "GCash",
+  maya: "Maya",
+  bank: "Bank transfer",
+};
+
+/** App URL schemes for a best-effort "open the wallet app" deep link. */
+export const WALLET_SCHEMES: Partial<Record<PaymentChoice, string>> = {
+  gcash: "gcash://",
+  maya: "paymaya://",
+};
 
 export interface OrderItemAddon {
   name: string;
@@ -159,6 +178,43 @@ export interface ActivityLog {
   action: string;
   details: Record<string, unknown>;
   created_at: string;
+}
+
+export type PaymentMethodType = "gcash" | "maya" | "bank";
+
+export interface PaymentMethod {
+  id: string;
+  tenant_id: string;
+  type: PaymentMethodType;
+  account_name: string | null;
+  account_number: string | null;
+  qr_url: string | null;
+  is_enabled: boolean;
+  display_order: number;
+}
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethodType, string> = {
+  gcash: "GCash",
+  maya: "Maya",
+  bank: "Bank transfer",
+};
+
+/** Human label for where an order goes (table, or its type). */
+export function orderDestination(
+  orderType: OrderType | null | undefined,
+  tableNumber: string | null
+): string {
+  if (tableNumber) return `Table ${tableNumber}`;
+  switch (orderType) {
+    case "pickup":
+      return "Pickup";
+    case "delivery":
+      return "Delivery";
+    case "dine_in":
+      return "Dine-in";
+    default:
+      return "Walk-in";
+  }
 }
 
 export interface CashCount {

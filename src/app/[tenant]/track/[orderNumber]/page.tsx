@@ -6,7 +6,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { Spinner, Avatar } from "@/components/ui";
-import { formatMoney, ORDER_STATUS_FLOW, OrderStatus } from "@/lib/types";
+import {
+  formatMoney,
+  orderDestination,
+  ORDER_STATUS_FLOW,
+  OrderStatus,
+  OrderType,
+  PaymentMethod,
+  PaymentChoice,
+  PAYMENT_METHOD_LABELS,
+} from "@/lib/types";
 
 interface TrackedItem {
   product_name: string;
@@ -22,7 +31,9 @@ interface TrackedOrder {
   order_number: string;
   order_status: OrderStatus;
   payment_status: string;
-  table_number: string;
+  payment_method: PaymentChoice;
+  order_type: OrderType;
+  table_number: string | null;
   subtotal: number;
   total: number;
   created_at: string;
@@ -45,6 +56,9 @@ export default function TrackOrderPage() {
 
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [payMethods, setPayMethods] = useState<PaymentMethod[]>([]);
+  const [payModal, setPayModal] = useState<PaymentMethod | null>(null);
+  const [chosen, setChosen] = useState<PaymentChoice | null>(null);
 
   const fetchOrder = useCallback(async () => {
     const { data } = await supabase.rpc("track_order", {
@@ -53,6 +67,50 @@ export default function TrackOrderPage() {
     setOrder(data);
     setLoading(false);
   }, [supabase, orderNumber]);
+
+  // Load the tenant's enabled e-wallet / bank QR options once.
+  useEffect(() => {
+    supabase
+      .from("payment_methods")
+      .select("*")
+      .eq("tenant_id", tenant.id)
+      .eq("is_enabled", true)
+      .order("display_order")
+      .then(({ data }) => setPayMethods((data as PaymentMethod[]) ?? []));
+  }, [supabase, tenant.id]);
+
+  // Record the customer's chosen payment method; for e-wallets, also show
+  // the QR and try to launch the app (best effort — see notes in the modal).
+  // Save the QR image to the phone so the customer can upload it inside
+  // GCash (Scan QR → from gallery) — you can't scan a QR on your own screen.
+  async function downloadQR(url: string, label: string) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = obj;
+      a.download = `${label}-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(obj);
+    } catch {
+      window.open(url, "_blank"); // fallback: open so they can long-press to save
+    }
+  }
+
+  function choosePayment(choice: PaymentChoice, pm?: PaymentMethod) {
+    if (!order) return;
+    setChosen(choice);
+    supabase.rpc("set_order_payment", {
+      p_order_number: order.order_number,
+      p_method: choice,
+    });
+    if (choice !== "counter" && pm) {
+      setPayModal(pm);
+    }
+  }
 
   useEffect(() => {
     fetchOrder();
@@ -224,7 +282,8 @@ export default function TrackOrderPage() {
             {tenant.name}
           </h1>
           <p className="text-xs text-gray-500">
-            Order {order.order_number} · Table {order.table_number}
+            Order {order.order_number} ·{" "}
+            {orderDestination(order.order_type, order.table_number)}
           </p>
         </div>
       </header>
@@ -338,12 +397,156 @@ export default function TrackOrderPage() {
         </p>
       </div>
 
+      {/* Payment chooser */}
+      <div className="card p-5">
+        <h3 className="font-semibold">Payment</h3>
+        {order.payment_status === "paid" ? (
+          <p className="mt-2 text-sm font-medium text-emerald-600">
+            ✓ Paid — thank you!
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-gray-400 mb-3">
+              How would you like to pay?
+            </p>
+            <div className="flex flex-col gap-2">
+              {(() => {
+                const active = chosen ?? order.payment_method ?? "counter";
+                return (
+                  <>
+                    <button
+                      onClick={() => choosePayment("counter")}
+                      className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left ${
+                        active === "counter"
+                          ? "border-brand bg-gray-50"
+                          : "border-gray-200"
+                      }`}
+                    >
+                      <span className="font-medium">🧾 Pay at counter</span>
+                      {active === "counter" && (
+                        <span className="text-brand font-semibold">✓</span>
+                      )}
+                    </button>
+                    {payMethods.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => choosePayment(m.type, m)}
+                        className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left ${
+                          active === m.type
+                            ? "border-brand bg-gray-50"
+                            : "border-gray-200 hover:border-brand"
+                        }`}
+                      >
+                        <span className="font-medium">
+                          {PAYMENT_METHOD_LABELS[m.type]}
+                        </span>
+                        <span className="text-sm text-brand font-semibold">
+                          {active === m.type
+                            ? "View QR →"
+                            : `Pay ${formatMoney(order.total)} →`}
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
+          </>
+        )}
+      </div>
+
       <Link
         href={`/${tenant.slug}/menu`}
         className="text-center text-sm text-gray-500 hover:text-gray-700 pb-8"
       >
         ← Back to menu
       </Link>
+
+      {/* QR-to-pay modal */}
+      {payModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setPayModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col items-center gap-4 text-center max-h-[92vh] overflow-y-auto"
+          >
+            <div>
+              <h3 className="font-bold text-lg">
+                Pay with {PAYMENT_METHOD_LABELS[payModal.type]}
+              </h3>
+              <p className="text-sm text-gray-500">
+                Amount due{" "}
+                <span className="font-bold text-brand">
+                  {formatMoney(order.total)}
+                </span>
+              </p>
+            </div>
+
+            {payModal.qr_url ? (
+              <img
+                src={payModal.qr_url}
+                alt={`${PAYMENT_METHOD_LABELS[payModal.type]} QR`}
+                className="w-60 h-60 object-contain rounded-xl border border-gray-200"
+              />
+            ) : (
+              <div className="w-60 h-60 rounded-xl bg-gray-100 flex items-center justify-center text-sm text-gray-400 px-4">
+                No QR uploaded — use the account details below.
+              </div>
+            )}
+
+            {(payModal.account_name || payModal.account_number) && (
+              <div className="text-sm">
+                {payModal.account_name && (
+                  <p className="font-medium">{payModal.account_name}</p>
+                )}
+                {payModal.account_number && (
+                  <p className="text-gray-500">{payModal.account_number}</p>
+                )}
+              </div>
+            )}
+
+            <div className="text-left text-xs text-gray-500 w-full bg-gray-50 rounded-xl p-3 leading-relaxed">
+              <p className="font-semibold text-gray-700 mb-1">
+                How to pay on this phone:
+              </p>
+              <p>1. Tap <b>Save QR</b> below.</p>
+              <p>
+                2. Open {PAYMENT_METHOD_LABELS[payModal.type]} → <b>Scan QR</b> →
+                upload from gallery.
+              </p>
+              <p>
+                3. Enter <b>{formatMoney(order.total)}</b> and pay, then keep
+                your receipt — staff will confirm it.
+              </p>
+              <p className="mt-1 text-gray-400">
+                (Paying from another phone? Just scan the QR directly.)
+              </p>
+            </div>
+
+            {payModal.qr_url && (
+              <button
+                onClick={() =>
+                  downloadQR(
+                    payModal.qr_url!,
+                    PAYMENT_METHOD_LABELS[payModal.type]
+                  )
+                }
+                className="btn-brand w-full py-2.5"
+              >
+                ⬇️ Save QR
+              </button>
+            )}
+            <button
+              onClick={() => setPayModal(null)}
+              className="w-full py-2 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

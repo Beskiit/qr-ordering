@@ -39,7 +39,8 @@ export default function NewOrderPage() {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [tableId, setTableId] = useState(""); // "" = walk-in
+  // Destination: "" = walk-in, "pickup", "delivery", or a table id (dine-in).
+  const [dest, setDest] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [optionsFor, setOptionsFor] = useState<Product | null>(null);
@@ -124,13 +125,25 @@ export default function NewOrderPage() {
       (!query || `${p.name} ${p.description ?? ""}`.toLowerCase().includes(query))
   );
 
+  // Decode the destination selection into a table id + order type.
+  const isTable = dest !== "" && dest !== "pickup" && dest !== "delivery";
+  const tableIdVal = isTable ? dest : null;
+  const orderType = isTable ? "dine_in" : dest === "" ? "walk_in" : dest;
+  const destLabel = isTable
+    ? `Table ${tables.find((t) => t.id === dest)?.table_number ?? ""}`
+    : dest === "pickup"
+    ? "Pickup"
+    : dest === "delivery"
+    ? "Delivery"
+    : "Walk-in";
+
   async function createOrder() {
     if (!branchId || cart.length === 0) return;
     setCreating(true);
     setError(null);
     const { data, error: rpcErr } = await supabase.rpc("staff_create_order", {
       p_branch_id: branchId,
-      p_table_id: tableId || null,
+      p_table_id: tableIdVal,
       p_items: cart.map((c) => ({
         product_id: c.product.id,
         quantity: c.quantity,
@@ -139,6 +152,7 @@ export default function NewOrderPage() {
         addon_ids: c.addons.map((a) => a.id),
       })),
       p_customer_name: customerName || null,
+      p_order_type: orderType,
     });
     setCreating(false);
     if (rpcErr || !data) {
@@ -149,10 +163,6 @@ export default function NewOrderPage() {
   }
 
   if (loading) return <Spinner label="Loading menu…" />;
-
-  const tableLabel = tableId
-    ? `Table ${tables.find((t) => t.id === tableId)?.table_number ?? ""}`
-    : "Walk-in";
 
   return (
     <div className="flex flex-col gap-4">
@@ -231,15 +241,21 @@ export default function NewOrderPage() {
             <label className="text-sm font-medium">For</label>
             <select
               className="input mt-1"
-              value={tableId}
-              onChange={(e) => setTableId(e.target.value)}
+              value={dest}
+              onChange={(e) => setDest(e.target.value)}
             >
               <option value="">Walk-in / Counter</option>
-              {tables.map((t) => (
-                <option key={t.id} value={t.id}>
-                  Table {t.table_number}
-                </option>
-              ))}
+              <option value="pickup">Pickup</option>
+              <option value="delivery">Delivery</option>
+              {tables.length > 0 && (
+                <optgroup label="Dine-in (table)">
+                  {tables.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      Table {t.table_number}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -335,7 +351,7 @@ export default function NewOrderPage() {
         <PaymentDialog
           orderId={created.id}
           orderNumber={created.number}
-          tableLabel={tableLabel}
+          tableLabel={destLabel}
           total={created.total}
           onClose={() => router.push(`/${tenant.slug}/dashboard`)}
           onPaid={() => router.push(`/${tenant.slug}/dashboard`)}

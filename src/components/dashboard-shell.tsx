@@ -20,6 +20,7 @@ const NAV = [
   { href: "/tables", label: "Tables & QR", icon: "🪑", roles: ["super_admin", "tenant_admin", "branch_admin"] },
   { href: "/branches", label: "Branches", icon: "🏪", roles: ["super_admin", "tenant_admin"] },
   { href: "/staff", label: "Staff", icon: "👥", roles: ["super_admin", "tenant_admin"] },
+  { href: "/payments", label: "Payment options", icon: "💳", roles: ["super_admin", "tenant_admin"] },
   { href: "/settings", label: "Settings", icon: "⚙️", roles: ["super_admin", "tenant_admin", "branch_admin", "branch_staff"] },
 ];
 

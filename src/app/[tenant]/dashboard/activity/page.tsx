@@ -6,7 +6,20 @@ import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState } from "@/components/ui";
 import { Drawer } from "@/components/drawer";
-import { formatMoney, ActivityLog } from "@/lib/types";
+import { MethodBadge } from "@/components/method-badge";
+import {
+  formatMoney,
+  ActivityLog,
+  PaymentChoice,
+  PAYMENT_CHOICE_LABELS,
+} from "@/lib/types";
+
+// The payment method recorded on a settled-payment log, if any.
+function payMethodOf(log: ActivityLog): PaymentChoice | null {
+  if (log.action !== "payment_settled") return null;
+  const m = log.details?.method;
+  return typeof m === "string" ? (m as PaymentChoice) : "counter";
+}
 
 const PAGE_SIZE = 50;
 
@@ -22,6 +35,7 @@ const DETAIL_LABELS: Record<string, string> = {
   change_due: "Change",
   from: "From",
   to: "To",
+  method: "Method",
   starting_float: "Starting float",
   counted_cash: "Counted",
   expected_cash: "Expected cash",
@@ -31,6 +45,8 @@ const DETAIL_LABELS: Record<string, string> = {
 
 function fmtDetail(key: string, value: unknown): string {
   if (value === null || value === undefined) return "—";
+  if (key === "method")
+    return PAYMENT_CHOICE_LABELS[value as PaymentChoice] ?? String(value);
   if (MONEY_KEYS.has(key) && !isNaN(Number(value))) return formatMoney(Number(value));
   return String(value);
 }
@@ -53,6 +69,15 @@ const FILTERS = [
   { key: "sessions", label: "Staff sessions" },
 ] as const;
 
+// Sub-filter by method, shown only under the Payments tab.
+const PAY_SUBFILTERS: { key: "all" | PaymentChoice; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "counter", label: "Cash" },
+  { key: "gcash", label: "GCash" },
+  { key: "maya", label: "Maya" },
+  { key: "bank", label: "Bank transfer" },
+];
+
 type FilterKey = (typeof FILTERS)[number]["key"];
 
 const FILTER_ACTIONS: Record<Exclude<FilterKey, "all">, string[]> = {
@@ -73,13 +98,23 @@ function describe(log: ActivityLog): { icon: string; text: string } {
       };
     case "order_status_changed":
       return { icon: "🔄", text: `Order ${num}: ${d.from} → ${d.to}` };
-    case "payment_settled":
+    case "payment_settled": {
+      const method = typeof d.method === "string" ? d.method : "counter";
+      if (method !== "counter") {
+        return {
+          icon: "💳",
+          text: `Order ${num} paid · ${
+            PAYMENT_CHOICE_LABELS[method as PaymentChoice] ?? method
+          } ${formatMoney(Number(d.total) || 0)}`,
+        };
+      }
       return {
         icon: "💵",
         text: `Order ${num} paid · cash ${formatMoney(
           Number(d.amount_paid) || 0
         )} · change ${formatMoney(Number(d.change_due) || 0)}`,
       };
+    }
     case "payment_undone":
       return { icon: "↩️", text: `Order ${num} payment undone` };
     case "drawer_closed": {
@@ -118,6 +153,7 @@ export default function ActivityPage() {
   const { staff, branches } = useDashboard();
 
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [payMethod, setPayMethod] = useState<"all" | PaymentChoice>("all");
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -142,10 +178,14 @@ export default function ActivityPage() {
       if (filter !== "all") {
         query = query.in("action", FILTER_ACTIONS[filter]);
       }
+      // Under Payments, optionally narrow to one method (jsonb field).
+      if (filter === "payments" && payMethod !== "all") {
+        query = query.eq("details->>method", payMethod);
+      }
       const { data } = await query;
       return (data as ActivityLog[]) ?? [];
     },
-    [supabase, tenant.id, filter]
+    [supabase, tenant.id, filter, payMethod]
   );
 
   useEffect(() => {
@@ -186,7 +226,10 @@ export default function ActivityPage() {
           {FILTERS.map((f) => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => {
+                setFilter(f.key);
+                setPayMethod("all");
+              }}
               className={`px-3 py-1.5 whitespace-nowrap ${
                 filter === f.key
                   ? "bg-brand text-white"
@@ -198,6 +241,26 @@ export default function ActivityPage() {
           ))}
         </div>
       </div>
+
+      {/* Payment method sub-filter */}
+      {filter === "payments" && (
+        <div className="flex gap-2 flex-wrap">
+          {PAY_SUBFILTERS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setPayMethod(s.key)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border ${
+                payMethod === s.key
+                  ? "border-brand bg-gray-50"
+                  : "border-gray-200 text-gray-600 hover:border-brand"
+              }`}
+            >
+              {s.key !== "all" && <MethodBadge type={s.key} size={18} />}
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <Spinner label="Loading activity…" />
@@ -211,13 +274,18 @@ export default function ActivityPage() {
           <div className="flex flex-col divide-y divide-gray-100">
             {logs.map((log) => {
               const { icon, text } = describe(log);
+              const payMethod = payMethodOf(log);
               return (
                 <button
                   key={log.id}
                   onClick={() => setSelected(log)}
                   className="w-full text-left py-2.5 flex items-center gap-3 text-sm hover:bg-gray-50 -mx-2 px-2 rounded-lg"
                 >
-                  <span className="text-lg shrink-0">{icon}</span>
+                  {payMethod ? (
+                    <MethodBadge type={payMethod} />
+                  ) : (
+                    <span className="text-lg shrink-0">{icon}</span>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{text}</p>
                     <p className="text-xs text-gray-500">
@@ -257,7 +325,11 @@ export default function ActivityPage() {
         {selected && (
           <div className="flex flex-col gap-5">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{describe(selected).icon}</span>
+              {payMethodOf(selected) ? (
+                <MethodBadge type={payMethodOf(selected)!} size={32} />
+              ) : (
+                <span className="text-2xl">{describe(selected).icon}</span>
+              )}
               <div>
                 <p className="font-bold">
                   {ACTION_LABELS[selected.action] ?? selected.action}

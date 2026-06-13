@@ -6,7 +6,7 @@ import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState } from "@/components/ui";
 import { Drawer } from "@/components/drawer";
 import { OrderDetailView } from "@/components/order-detail";
-import { formatMoney, Order, OrderItem } from "@/lib/types";
+import { formatMoney, orderDestination, Order, OrderItem } from "@/lib/types";
 
 type OrderRow = Order & {
   order_items: OrderItem[];
@@ -92,9 +92,7 @@ export default function ReceiptsPage() {
                 </span>
               </div>
               <p className="text-xs text-gray-500">
-                {o.tables?.table_number
-                  ? `Table ${o.tables.table_number}`
-                  : "Walk-in"}
+                {orderDestination(o.order_type, o.tables?.table_number ?? null)}
                 {o.customer_name ? ` · ${o.customer_name}` : ""}
               </p>
               <p className="text-xs text-gray-400">
