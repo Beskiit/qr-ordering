@@ -5,9 +5,45 @@ import { createClient } from "@/lib/supabase/client";
 import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, EmptyState } from "@/components/ui";
+import { Drawer } from "@/components/drawer";
 import { formatMoney, ActivityLog } from "@/lib/types";
 
 const PAGE_SIZE = 50;
+
+const MONEY_KEYS = new Set([
+  "total", "amount_paid", "change_due", "starting_float",
+  "counted_cash", "expected_cash", "variance", "left_in_drawer",
+]);
+
+const DETAIL_LABELS: Record<string, string> = {
+  order_number: "Order",
+  total: "Total",
+  amount_paid: "Cash received",
+  change_due: "Change",
+  from: "From",
+  to: "To",
+  starting_float: "Starting float",
+  counted_cash: "Counted",
+  expected_cash: "Expected cash",
+  variance: "Variance",
+  left_in_drawer: "Left in drawer",
+};
+
+function fmtDetail(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (MONEY_KEYS.has(key) && !isNaN(Number(value))) return formatMoney(Number(value));
+  return String(value);
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  order_placed: "Order placed",
+  order_status_changed: "Order status changed",
+  payment_settled: "Payment settled",
+  payment_undone: "Payment undone",
+  drawer_closed: "Drawer closed",
+  staff_signed_in: "Signed in",
+  staff_signed_out: "Signed out",
+};
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -86,6 +122,7 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [selected, setSelected] = useState<ActivityLog | null>(null);
 
   const isAllowed = staff.role !== "branch_staff";
 
@@ -175,7 +212,11 @@ export default function ActivityPage() {
             {logs.map((log) => {
               const { icon, text } = describe(log);
               return (
-                <div key={log.id} className="py-2.5 flex items-center gap-3 text-sm">
+                <button
+                  key={log.id}
+                  onClick={() => setSelected(log)}
+                  className="w-full text-left py-2.5 flex items-center gap-3 text-sm hover:bg-gray-50 -mx-2 px-2 rounded-lg"
+                >
                   <span className="text-lg shrink-0">{icon}</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{text}</p>
@@ -191,7 +232,7 @@ export default function ActivityPage() {
                       minute: "2-digit",
                     })}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -207,6 +248,54 @@ export default function ActivityPage() {
           )}
         </div>
       )}
+
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title="Activity details"
+      >
+        {selected && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{describe(selected).icon}</span>
+              <div>
+                <p className="font-bold">
+                  {ACTION_LABELS[selected.action] ?? selected.action}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {selected.actor_name} · {branchName(selected.branch_id)}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-500">
+              {new Date(selected.created_at).toLocaleString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </div>
+
+            {Object.keys(selected.details ?? {}).length > 0 && (
+              <div className="rounded-xl bg-gray-50 p-4 flex flex-col gap-2 text-sm">
+                {Object.entries(selected.details).map(([key, value]) => (
+                  <div key={key} className="flex justify-between gap-3">
+                    <span className="text-gray-500">
+                      {DETAIL_LABELS[key] ?? key}
+                    </span>
+                    <span className="font-medium text-right break-all">
+                      {fmtDetail(key, value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }

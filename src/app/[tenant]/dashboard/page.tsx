@@ -7,6 +7,8 @@ import { useTenant } from "@/lib/tenant-context";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Spinner, StatusBadge, EmptyState } from "@/components/ui";
 import { PaymentDialog } from "@/components/payment-dialog";
+import { Drawer } from "@/components/drawer";
+import { OrderDetailView } from "@/components/order-detail";
 import { useConfirm } from "@/components/feedback";
 import { formatMoney, Order, OrderItem, OrderStatus } from "@/lib/types";
 
@@ -30,8 +32,8 @@ export default function OrdersBoard() {
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"active" | "all">("active");
   const [settling, setSettling] = useState<OrderRow | null>(null);
+  const [selected, setSelected] = useState<OrderRow | null>(null);
 
   const fetchOrders = useCallback(async () => {
     if (!branchId) return;
@@ -101,10 +103,9 @@ export default function OrdersBoard() {
     fetchOrders();
   }
 
-  const visible = orders.filter((o) =>
-    filter === "active"
-      ? !["completed", "cancelled"].includes(o.order_status)
-      : true
+  // Live board shows active orders only; completed ones live in Receipts.
+  const visible = orders.filter(
+    (o) => !["completed", "cancelled"].includes(o.order_status)
   );
 
   if (loading) return <Spinner label="Loading orders…" />;
@@ -118,27 +119,12 @@ export default function OrdersBoard() {
             (live · updates automatically)
           </span>
         </h2>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-            {(["active", "all"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 capitalize ${
-                  filter === f ? "bg-brand text-white" : "bg-white text-gray-600"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          <Link
-            href={`/${tenant.slug}/dashboard/new-order`}
-            className="btn-brand text-sm whitespace-nowrap"
-          >
-            + New order
-          </Link>
-        </div>
+        <Link
+          href={`/${tenant.slug}/dashboard/new-order`}
+          className="btn-brand text-sm whitespace-nowrap"
+        >
+          + New order
+        </Link>
       </div>
 
       {visible.length === 0 ? (
@@ -148,7 +134,11 @@ export default function OrdersBoard() {
           {visible.map((o) => {
             const action = NEXT_ACTION[o.order_status];
             return (
-              <div key={o.id} className="card p-4 flex flex-col gap-3">
+              <div
+                key={o.id}
+                onClick={() => setSelected(o)}
+                className="card p-4 flex flex-col gap-3 cursor-pointer hover:shadow-md transition"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-bold">{o.order_number}</p>
@@ -190,7 +180,10 @@ export default function OrdersBoard() {
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div
+                  className="flex items-center justify-between"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <span className="font-bold text-brand">
                     {formatMoney(o.total)}
                   </span>
@@ -219,7 +212,10 @@ export default function OrdersBoard() {
                   </p>
                 )}
 
-                <div className="flex gap-2">
+                <div
+                  className="flex gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {action && (
                     <button
                       onClick={() => setStatus(o, action[0])}
@@ -260,6 +256,21 @@ export default function OrdersBoard() {
           }}
         />
       )}
+
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title="Order details"
+      >
+        {selected && (
+          <OrderDetailView
+            order={{
+              ...selected,
+              tableNumber: selected.tables?.table_number ?? null,
+            }}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }
